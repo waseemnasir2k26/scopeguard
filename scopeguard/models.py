@@ -26,6 +26,9 @@ class Sow:
     clauses: list[Clause]
     revision_limit: Optional[int] = None
     revision_clause: Optional[str] = None
+    page_count: Optional[int] = None          # "a five-page website"
+    page_names: list = field(default_factory=list)   # "Home, About, Services, ..." (lowercase)
+    page_clause: Optional[str] = None
 
     def by_id(self, cid: str) -> Optional[Clause]:
         for c in self.clauses:

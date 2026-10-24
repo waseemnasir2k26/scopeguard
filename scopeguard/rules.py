@@ -65,16 +65,62 @@ def match_exclusion(text: str, sow: Sow) -> Optional[Clause]:
     return best if score > deliv else None
 
 
-def precheck(req: Request, sow: Sow) -> Optional[dict]:
+_PAGE_NEW = re.compile(
+    r"\b(?:another|an?\s+(?:extra|additional|separate)|(?:sixth|seventh|eighth|ninth|tenth|6th|7th|8th|9th|10th)|"
+    r"\d+\s+(?:more|extra|new|additional))\s+(?:\w+\s+)?pages?\b", re.I)
+_PAGE_INTRO = re.compile(r"\b(?:an?|new|another|extra|additional)\s+(?:new\s+)?([A-Za-z][\w&-]*)\s+page\b", re.I)
+_PAGE_MENTION = re.compile(r"\b([A-Za-z][\w&-]*)\s+(?:page|section)\b", re.I)
+_PAGE_VERB = re.compile(r"\b(add|create|build|need|want|include|have|make|set ?up|put|insert)\b", re.I)
+_PAGE_DESTRUCTIVE = re.compile(r"\b(remove|delete|drop|redesign|rebuild|replace|merge|split)\b", re.I)
+_PAGE_GENERIC = {"the", "a", "an", "our", "this", "that", "each", "every", "whole", "new", "extra", "first", "last",
+                 "same", "single", "landing", "main", "other", "separate", "additional", "another", "web", "one"}
+
+
+def page_rule(text: str, sow: Sow, state: dict) -> Optional[dict]:
+    """Page counter. A request that names a page the SOW lists is IN-SCOPE; a request for a page
+    the SOW does not list is OUT-OF-SCOPE once it pushes past the SOW's page count."""
+    if not sow.page_count or not sow.page_names or not _PAGE_VERB.search(text) or _PAGE_DESTRUCTIVE.search(text):
+        return None
+    pc = sow.by_id(sow.page_clause) if sow.page_clause else None
+    listed = set(sow.page_names)
+    new_name = None
+    m = _PAGE_NEW.search(text)
+    if m:
+        new_name = m.group(0).lower()
+    else:
+        intro = _PAGE_INTRO.search(text)
+        if intro and intro.group(1).lower() not in _PAGE_GENERIC and intro.group(1).lower() not in listed:
+            new_name = intro.group(1).lower()
+    if new_name:
+        seen = state.setdefault("new_pages", [])
+        slots = sow.page_count - len(sow.page_names)
+        if new_name not in seen:
+            seen.append(new_name)
+        if seen.index(new_name) + 1 > slots:
+            return {"cls": OUT_OF_SCOPE, "clause": pc, "rule": "page_count", "confidence": 0.85,
+                    "reason": f"The SOW lists {sow.page_count} pages ({', '.join(sow.page_names)}); "
+                              f"a further page ('{new_name}') goes past that count."}
+        return {"cls": IN_SCOPE, "clause": pc, "rule": "page_listed", "confidence": 0.8,
+                "reason": f"Within the {sow.page_count} pages in the SOW (page {len(sow.page_names) + seen.index(new_name) + 1})."}
+    for mm in _PAGE_MENTION.finditer(text):
+        name = mm.group(1).lower()
+        if name in listed:
+            return {"cls": IN_SCOPE, "clause": pc, "rule": "page_listed", "confidence": 0.85,
+                    "reason": f"The {name.title()} page is one of the {sow.page_count} pages the SOW lists."}
+    return None
+
+
+def precheck(req: Request, sow: Sow, state: Optional[dict] = None) -> Optional[dict]:
     """Final verdict from rules alone, or None when the LLM should decide.
 
     Returns {cls, clause, rule, confidence, reason}."""
+    state = {} if state is None else state
     if not req.is_revision:
         ex = match_exclusion(req.text(), sow)
         if ex is not None:
             return {"cls": OUT_OF_SCOPE, "clause": ex, "rule": "explicit_exclusion", "confidence": 0.9,
                     "reason": f"The SOW explicitly excludes this ({ex.cite()})."}
-        return None
+        return page_rule(req.text(), sow, state)
     # revision-type request: governed by the revision allowance, never by an exclusion keyword
     if not sow.revision_limit:
         return None

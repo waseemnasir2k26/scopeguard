@@ -1,6 +1,6 @@
 > DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.
 
-**Subject:** Quick scope check: Add Online Shop
+**Subject:** Quick scope check: Add online shop to website
 
 Hi Dana,
 

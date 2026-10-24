@@ -266,6 +266,30 @@
    "text": "Can we talk about adding something for events later?",
    "expect": "UNCLEAR",
    "tag": "vague"
+  },
+  {
+   "id": "L43",
+   "text": "Could you also add a Meet the Team section to the About page?",
+   "expect": "IN-SCOPE",
+   "tag": "page"
+  },
+  {
+   "id": "L44",
+   "text": "Please add a short FAQ section to the Home page.",
+   "expect": "IN-SCOPE",
+   "tag": "page"
+  },
+  {
+   "id": "L45",
+   "text": "Can you add a Pricing page?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "page"
+  },
+  {
+   "id": "L46",
+   "text": "Could you add a testimonials page as well?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "page"
   }
  ]
 }

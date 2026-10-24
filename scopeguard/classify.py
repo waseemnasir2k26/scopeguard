@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from .llm import LLMError
 from .models import CLASSES, IN_SCOPE, OUT_OF_SCOPE, UNCLEAR, Finding, Request, Sow
 from .rules import precheck
+from .textutil import overlap
 
 SCHEMA = {
     "type": "object",
@@ -87,17 +88,19 @@ def _ask(req: Request, sow: Sow, llm, redact_fn, min_confidence: float) -> dict:
                 "hours": None, "title": "", "notes": ["llm error"]}
 
 
-def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidence: float) -> Finding:
+def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidence: float,
+                 state: Optional[dict] = None) -> Finding:
     f = Finding(id=f"REQ-{idx:02d}", request=req, cls=UNCLEAR, confidence=0.0)
     default_title = " ".join(req.quote.rstrip("?.! ").split()[:8])
-    rule = precheck(req, sow)                       # 1. deterministic layer, final
+    rule = precheck(req, sow, state)                # 1. deterministic layer, final
     if rule is not None:
         clause = rule["clause"]
         f.cls, f.confidence, f.reason, f.rule = rule["cls"], rule["confidence"], rule["reason"], rule["rule"]
         if clause:
             f.clause_id, f.clause_text, f.clause_ref = clause.id, clause.text, clause.ref
         hours, title = None, ""
-        if f.cls == OUT_OF_SCOPE and llm is not None:   # the model only proposes hours and a title here
+        # the model only proposes hours and a title here; revision overages use the rate-card default
+        if f.cls == OUT_OF_SCOPE and llm is not None and f.rule != "revision_limit":
             side = _ask(req, sow, llm, redact_fn, 0.0)
             hours, title = side["hours"], side["title"]
         f.title = title or default_title
@@ -110,14 +113,22 @@ def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidenc
     if v["clause"]:
         f.clause_id, f.clause_text, f.clause_ref = v["clause"].id, v["clause"].text, v["clause"].ref
     f.estimate = {"llm_hours": v["hours"]}
+    # support check: an OUT verdict that cites an exclusion must share words or a phrase with it
+    if f.cls == OUT_OF_SCOPE and v["clause"] is not None and v["clause"].kind == "exclusion"             and overlap(req.text(), v["clause"].text) == 0:
+        f.notes.append(f"model cited exclusion {v['clause'].id} but the request doesn't mention it; downgraded to UNCLEAR")
+        f.reason = (f"Model cited exclusion {v['clause'].id} but the request doesn't mention it. "
+                    f"(Model said: {f.reason})")[:600]
+        f.cls, f.confidence = UNCLEAR, min(f.confidence, 0.4)
+        f.clause_id, f.clause_text, f.clause_ref = None, "", ""
     return f
 
 
 def classify_all(requests: list[Request], sow: Sow, llm, redact_fn=lambda s: s, min_confidence: float = 0.5,
                  progress: Optional[Callable[[int, int, Finding], None]] = None) -> list[Finding]:
     out = []
+    state: dict = {}                      # page counter shared across the whole conversation
     for i, r in enumerate(requests, 1):
-        f = classify_one(r, i, sow, llm, redact_fn, min_confidence)
+        f = classify_one(r, i, sow, llm, redact_fn, min_confidence, state)
         out.append(f)
         if progress:
             progress(i, len(requests), f)

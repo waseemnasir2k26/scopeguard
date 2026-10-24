@@ -53,8 +53,8 @@ def test_revision_allowance_then_limit_decided_before_the_llm():
     assert [f.rule for f in fs] == ["revision_allowance", "revision_allowance", "revision_limit"]
     assert fs[0].clause_id == "C3" and fs[2].clause_id == "C3"
     assert "round 3" in fs[2].reason.lower() and "2" in fs[2].reason
-    assert len(llm.prompts) == 1          # only the out-of-scope item asked the model (for hours); IN revisions never did
-    assert fs[2].estimate["llm_hours"] == 1.5
+    assert llm.prompts == []              # revisions are decided without the model; overages use the rate-card default
+    assert fs[2].estimate["llm_hours"] is None
 
 
 # ---------------------------------------------------------------- exclusions
@@ -160,7 +160,7 @@ def test_mock_llm_classification_mix():
 
 def test_json_extraction_and_retry():
     assert extract_json('Sure!\n```json\n{"a": {"b": "}"}}\n``` bye') == {"a": {"b": "}"}}
-    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C4", "confidence": 0.8, "reason": "r",
+    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C1", "confidence": 0.8, "reason": "r",
                        "estimated_hours": 2, "title": "t"})
     llm = FakeLLM(replies=["I think it is out of scope", good])
     [f] = classify_all([rq(1, "M1", "Please add a podcast page for us.", rev=False)], SOW, llm)
@@ -249,3 +249,78 @@ def test_eval_mock_accuracy_floor_and_cli(examples, capsys):
     assert rc == 0 and "revision cases: 14/14 correct" in out
     acc = float(out.split("overall accuracy:")[1].split("%")[0])
     assert acc >= 85.0
+
+
+# ---------------------------------------------------------------- support check and page counter
+PAGES_SOW = parse_sow("""## Deliverables
+- A five-page responsive website: Home, About, Services, Portfolio and Contact.
+- A contact form.
+## Revisions
+- Two rounds of revisions are included.
+## Exclusions
+- A blog, and the writing of blog posts or any other copywriting, are not included.
+- Hosting is not included.
+""")
+
+
+def _llm_says(cls, clause, conf=0.95, hours=4):
+    return FakeLLM(fn=lambda s, u: json.dumps({"class": cls, "clause_id": clause, "confidence": conf,
+                                               "reason": "r", "estimated_hours": hours, "title": "t"}))
+
+
+def test_out_citing_an_exclusion_without_textual_support_is_unclear():
+    # the Meet-the-Team mistake: model cites an exclusion (C5, hosting) for a request that never mentions it
+    r = rq(1, "M1", "Could you add a team photo carousel on the homepage?", rev=False)
+    [f] = classify_all([r], PAGES_SOW, _llm_says("OUT-OF-SCOPE", "C5"))
+    assert f.cls == UNCLEAR and f.clause_id is None
+    assert "cited exclusion C5 but the request doesn't mention it" in f.reason
+    assert any("downgraded" in n for n in f.notes)
+
+
+def test_out_citing_an_exclusion_with_support_is_kept():
+    r = rq(1, "M1", "Can you post our weekly update?", rev=False)   # shares 'post' with the blog exclusion, no phrase match
+    [f] = classify_all([r], PAGES_SOW, _llm_says("OUT-OF-SCOPE", "C4"))
+    assert f.cls == OUT_OF_SCOPE and f.clause_id == "C4" and f.rule is None
+
+
+def test_page_counter_named_listed_page_is_in_scope():
+    for text in ['Could you also add a "Meet the Team" section to the About page?',
+                 "Please add a short FAQ section to the Home page.", "Can we add a Services page?"]:
+        [f] = classify_all([rq(1, "M1", text, rev=False)], PAGES_SOW, _llm_says("OUT-OF-SCOPE", "C5"))
+        assert f.cls == IN_SCOPE and f.rule == "page_listed" and f.clause_id == "C1", text
+
+
+def test_page_counter_pushing_past_the_count_is_out_of_scope():
+    for text in ["Please add a sixth page for our Careers section.", "Can you add a Pricing page?",
+                 "Could you add a testimonials page as well?"]:
+        [f] = classify_all([rq(1, "M1", text, rev=False)], PAGES_SOW, _llm_says("IN-SCOPE", "C1"))
+        assert f.cls == OUT_OF_SCOPE and f.rule == "page_count" and f.clause_id == "C1", text
+
+
+def test_page_counter_counts_free_slots_across_requests():
+    sow = parse_sow("## Deliverables\n- A four-page website: Home, About and Contact.\n- A contact form.\n")
+    reqs = [rq(1, "M1", "Please add a Pricing page.", rev=False), rq(2, "M2", "Please add a Careers page too.", rev=False)]
+    fs = classify_all(reqs, sow, _llm_says("UNCLEAR", None))
+    assert [f.cls for f in fs] == [IN_SCOPE, OUT_OF_SCOPE]          # one free slot, then past the count
+
+
+def test_page_rule_never_overrides_revisions_or_exclusions():
+    r = rq(1, "M1", "Could you change the heading on the Home page?", "2026-03-01T10:00:00")
+    assert r.is_revision
+    assign_revision_rounds([r])
+    [f] = classify_all([r], PAGES_SOW, _llm_says("OUT-OF-SCOPE", "C5"))
+    assert f.rule == "revision_allowance"
+    [g] = classify_all([rq(2, "M2", "Please add a blog page", rev=False)], PAGES_SOW, _llm_says("IN-SCOPE", "C1"))
+    assert g.rule == "explicit_exclusion"
+
+
+def test_revision_overage_uses_rate_card_default_not_model_hours():
+    from scopeguard.pipeline import Options, analyze
+    from scopeguard.rates import RateCard
+    texts = ["Can you change the heading font please?", "Please make the footer colour darker.", "Move the banner above the menu."]
+    msgs = [Message(id="", sender="Dana Okafor", text=t, ts=f"2026-03-0{d}T10:00:00") for d, t in zip((1, 2, 3), texts)]
+    res = analyze(PAGES_SOW, messages=msgs, opts=Options(llm=_llm_says("OUT-OF-SCOPE", "C1", hours=9),
+                                                         rates=RateCard(hourly_rate=100, default_hours=1.5)))
+    third = res.findings[-1] if len(res.findings) == 3 else None
+    assert third is not None and third.rule == "revision_limit"
+    assert third.estimate["hours"] == 1.5 and "default hours" in third.estimate["basis"]

@@ -106,7 +106,7 @@ EVIL = '<script>alert(1)</script> "quoted" & =HYPERLINK("http://evil.example")'
 def _run_evil(tmp_path):
     msgs = [Message(id="", sender="<b>Sam</b>", text=f"Can you add {EVIL} please?")]
     llm = FakeLLM(fn=lambda s, u: json.dumps({
-        "class": "OUT-OF-SCOPE", "clause_id": "C3", "confidence": 0.9,
+        "class": "OUT-OF-SCOPE", "clause_id": "C1", "confidence": 0.9,
         "reason": "<img src=x onerror=alert(1)>", "estimated_hours": 2, "title": "=cmd|' /C calc'!A0"}))
     res = analyze(SOW, messages=msgs, opts=Options(llm=llm))
     write_all(res, tmp_path / "out", RateCard())

@@ -67,6 +67,7 @@ _EXCL_TEXT = re.compile(
 _REV_TEXT = re.compile(r"\brounds?\s+of\s+(?:\w+\s+)?(?:revisions?|changes|edits|feedback)|\brevisions?\b|\brevision rounds?\b", re.I)
 _TIME_TEXT = re.compile(r"\b(week|weeks|days?|deadline|milestone|launch date|kick-?off|within \d+|business days?)\b", re.I)
 
+_PAGES = re.compile(r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)[- ]pages?\b", re.I)
 _REV_LIMIT = re.compile(
     r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:\(\d+\)\s*)?"
     r"(?:\w+\s+){0,2}?(?:rounds?|revisions?|revision rounds?)\b", re.I)
@@ -162,6 +163,20 @@ def parse_sow(text: str) -> Sow:
                 if n:
                     sow.revision_limit, sow.revision_clause = n, c.id
                     break
+    for c in clauses:
+        if c.kind != "deliverable":
+            continue
+        m = _PAGES.search(c.text)
+        if m:
+            tok = m.group("n").lower()
+            n = int(tok) if tok.isdigit() else NUMBER_WORDS.get(tok)
+            if n:
+                sow.page_count, sow.page_clause = n, c.id
+                tail = c.text[m.end():]
+                if ":" in tail:
+                    names = re.split(r",|/|&|\band\b", tail.split(":", 1)[1])
+                    sow.page_names = [x.strip(" .;").lower() for x in names if x.strip(" .;")]
+                break
     return sow
 
 

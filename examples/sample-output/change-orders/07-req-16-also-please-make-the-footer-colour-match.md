@@ -1,10 +1,10 @@
 > DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.
 
-**Subject:** Quick scope check: Change Heading Font
+**Subject:** Quick scope check: Also please make the footer colour match the
 
 Hi Dana,
 
-Thanks for this, and happy to help. You asked: "Can you change the heading font to something rounder?"
+Thanks for this, and happy to help. You asked: "Also please make the footer colour match the logo."
 
 We've now used the 2 revision round(s) included in the agreement, so I'd like to treat further changes as a small add-on. The closest part of the agreed scope is: C10 (SOW 2.1).
 
