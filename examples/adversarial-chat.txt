@@ -1,10 +1,18 @@
 05/10/2026, 09:00 - Dana Okafor: Actually please don't add an online shop, I changed my mind.
-05/10/2026, 09:05 - Dana Okafor: Do you also do blog writing? Just curious, we don't need one.
-05/10/2026, 09:10 - Dana Okafor: Please use the photos I sent for the gallery.
-05/10/2026, 09:12 - Dana Okafor: I will send the logo files and photographs tomorrow, can you place them in the header?
-05/10/2026, 09:20 - Dana Okafor: Could you add alt text to the gallery images?
-05/10/2026, 09:25 - Dana Okafor: Can the gallery show 30 photos?
-05/10/2026, 09:30 - Dana Okafor: Could the contact form send enquiries to two email addresses?
-05/10/2026, 09:40 - Dana Okafor: No need for a booking calendar after all.
-05/10/2026, 09:45 - Dana Okafor: How much would a Spanish version cost?
-05/10/2026, 09:50 - Dana Okafor: Please add a Pricing page for the studio.
+05/10/2026, 09:05 - Dana Okafor: Could you add a blog? Actually never mind, forget it.
+05/10/2026, 09:10 - Dana Okafor: Please add a booking calendar to the Contact page.
+05/10/2026, 09:12 - Dana Okafor: Thanks! Also, can you write the text for the Services page?
+05/10/2026, 09:14 - Dana Okafor: On reflection, forget the booking calendar.
+05/10/2026, 09:20 - Dana Okafor: Could you add a Spanish version if we have money left?
+05/10/2026, 09:25 - Dana Okafor: Oh sure, let's add a blog, a shop and a booking system while we're at it, why not.
+05/10/2026, 09:30 - Dana Okafor: Do you also do newsletter setup? Just curious, we don't need one.
+05/10/2026, 09:35 - Dana Okafor: Please use the photos I sent for the gallery.
+05/10/2026, 09:36 - Dana Okafor: Please use the logo I designed in the header.
+05/10/2026, 09:40 - Dana Okafor: I sent 40 photos, please use the best 20 in the gallery.
+05/10/2026, 09:45 - Dana Okafor: Can the gallery show thirty photos?
+05/10/2026, 09:50 - Dana Okafor: Could the contact form send enquiries to two email addresses?
+05/10/2026, 10:00 - Dana Okafor: Can you add a live chat widget?
+05/10/2026, 10:02 - Alex Rivera: Sure, the live chat is on the house.
+05/10/2026, 10:10 - Dana Okafor: Please add a Pricing page for the studio.
+05/10/2026, 10:20 - Dana Okafor: Would it be possible to add a members area? No pressure at all.
+05/10/2026, 10:30 - Dana Okafor: Don't forget to add the newsletter signup we discussed.

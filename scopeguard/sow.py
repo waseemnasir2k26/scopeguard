@@ -7,6 +7,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from .models import Clause, Sow
+from .quantity import parse_quantities
 from .textutil import NUMBER_WORDS
 
 MAX_BYTES = 20 * 1024 * 1024
@@ -75,9 +76,8 @@ _UNITS = {"photo": "image", "photos": "image", "image": "image", "images": "imag
           "logins": "user", "page": "page", "pages": "page", "revision": "revision", "revisions": "revision",
           "round": "revision", "rounds": "revision", "section": "section", "sections": "section",
           "slide": "slide", "slides": "slide"}
-_NUMW = r"\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|fifty"
-_CAP = re.compile(r"\b(?P<n>" + _NUMW + r")\s+(?:(?:email|client-supplied|additional|extra|new)\s+)?"
-                  r"(?P<unit>[A-Za-z]+)\b", re.I)
+_EXC = re.compile(r"\(\s*(?:except|other than|apart from|excluding|save for|unless)\s+(?P<a>[^)]*)\)|"
+                  r",?\s*\b(?:except|other than|apart from|save for|unless)\b\s+(?P<b>[^,.;]*)", re.I)
 _SUPPLY = re.compile(r"\b(?:the\s+)?(?:client|customer)\s+(?:will\s+)?(?:supplies|supply|provides|provide|sends|send)\s+"
                      r"(?P<what>[^.;]+)", re.I)
 
@@ -172,6 +172,16 @@ def parse_sow(text: str) -> Sow:
         para.append(line.strip())
     flush()
 
+    for c in clauses:           # nested exceptions: "A blog (except one launch post, which is included)"
+        if c.kind == "exclusion":
+            m = _EXC.search(c.text)
+            if m:
+                exc = (m.group("a") or m.group("b") or "").strip()
+                item = re.split(r",\s*(?:which|that)\b", exc, maxsplit=1)[0].strip()
+                if item:
+                    c.exceptions = [item]
+                    c.exception_included = bool(re.search(r"\b(?:is|are)\s+(?:included|covered)\b", exc, re.I))
+                    c.core = (c.text[:m.start()] + c.text[m.end():]).replace(" ,", ",").strip()
     sow = Sow(clauses=clauses)
     for c in clauses:
         if c.kind == "revision":
@@ -183,12 +193,13 @@ def parse_sow(text: str) -> Sow:
                     sow.revision_limit, sow.revision_clause = n, c.id
                     break
     for c in clauses:
-        for m in _CAP.finditer(c.text):
-            tok = m.group("n").lower()
-            n = int(tok) if tok.isdigit() else NUMBER_WORDS.get(tok)
-            unit = canonical_unit(m.group("unit"))
-            if n and unit and unit not in ("page", "revision"):
-                sow.caps.append({"unit": unit, "n": n, "clause": c.id})
+        for q in parse_quantities(c.core_text(), canonical_unit):
+            unit = canonical_unit(q.unit_word)
+            if q.n is None or q.vague or q.per or unit in (None, "page", "revision"):
+                continue
+            if any(w in ("minimum", "least", "min") for w in q.prev):
+                continue                      # "minimum 6 images" is a floor, not a cap
+            sow.caps.append({"unit": unit, "n": q.n, "clause": c.id})
         m = _SUPPLY.search(c.text)
         if m and not sow.client_clause:
             from .textutil import concepts

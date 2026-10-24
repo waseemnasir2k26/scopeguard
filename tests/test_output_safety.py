@@ -105,7 +105,7 @@ EVIL = '<script>alert(1)</script> "quoted" & =HYPERLINK("http://evil.example")'
 
 
 def _run_evil(tmp_path):
-    msgs = [Message(id="", sender="<b>Sam</b>", text=f"Can you add {EVIL} please?")]
+    msgs = [Message(id="", sender="<b>Sam</b>", text=f"Can you add an online shop {EVIL} please?")]
     llm = FakeLLM(fn=lambda s, u: json.dumps({
         "class": "OUT-OF-SCOPE", "clause_id": "C1", "confidence": 0.9,
         "reason": "<img src=x onerror=alert(1)>", "estimated_hours": 2, "title": "=cmd|' /C calc'!A0"}))
@@ -121,7 +121,7 @@ def test_html_report_is_escaped_and_self_contained(tmp_path):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert html.count("<script>") == 1                       # only our own filter script
     assert not re.search(r"(src|href)=[\"']?https?://", html)   # no external resources
-    assert "Content-Security-Policy" in html and 'data-f=OUT-OF-SCOPE' in html
+    assert "Content-Security-Policy" in html and 'data-f=extra' in html and "Possible extras" in html
 
 
 def test_csv_is_formula_injection_safe(tmp_path):
@@ -133,7 +133,7 @@ def test_csv_is_formula_injection_safe(tmp_path):
     assert csv_safe("=1+1") == "'=1+1" and csv_safe("@SUM(A1)") == "'@SUM(A1)" and csv_safe("-2") == "'-2"
     assert csv_safe("+1") == "'+1" and csv_safe("safe") == "safe" and csv_safe(None) == ""
     # the quote cell must keep its content, just neutralised where it would start with a formula char
-    assert "HYPERLINK" in rows[1][5]
+    assert "HYPERLINK" in rows[1][7]
 
 
 def test_never_sends_anything():
@@ -144,13 +144,18 @@ def test_never_sends_anything():
     assert src.count("urllib.request.urlopen") <= 3 and not re.search(r"import requests|requests"+chr(92)+".(get|post)", src)
 
 
-def test_outputs_stay_inside_out_dir_and_drafts_are_marked(tmp_path):
+def test_analyze_never_writes_drafts_and_bill_drafts_only_what_you_name(tmp_path):
+    from scopeguard.bill import BillError, bill
     out = _run_evil(tmp_path)
     files = sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file())
-    assert "report.html" in files and "scope-log.csv" in files and "summary.md" in files
-    drafts = [f for f in files if f.startswith("change-orders/")]
-    assert drafts and all(f.endswith(".md") for f in drafts)
-    assert all((out / d).read_text(encoding="utf-8").startswith("> DRAFT") for d in drafts)
+    assert "report.html" in files and "scope-log.csv" in files and "summary.md" in files and "findings.json" in files
+    assert not (out / "change-orders").exists()                       # analyze NEVER drafts
+    data = json.loads((out / "findings.json").read_text(encoding="utf-8"))
+    [item] = [f for f in data["findings"] if f["status"] == "extra"]
+    with pytest.raises(BillError):
+        bill(out, [], RateCard())                                      # no item named, nothing drafted
+    [path] = bill(out, [item["fingerprint"]], RateCard())
+    assert path.read_text(encoding="utf-8").startswith("> DRAFT")
     assert {p.name for p in tmp_path.iterdir()} == {"out"}
 
 
@@ -206,6 +211,17 @@ def server(examples):
     srv.server_close()
 
 
+@pytest.fixture
+def srv_noclient(examples):
+    from scopeguard.sow import load_text
+    text = load_text(examples / "sow.md")
+    srv = make_server("127.0.0.1", 0, parse_sow(text), text, Options(llm=MockLLM()), token="tok")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+    srv.server_close()
+
+
 def _post(url, body, token=None):
     h = {"Content-Type": "application/json"}
     if token:
@@ -243,13 +259,19 @@ def test_server_requires_token_and_validates_body(server):
     assert ei.value.code == 404
 
 
-def test_server_analyze_returns_drafts_only(server):
+def test_server_analyze_returns_possible_extras_never_drafts(server):
     status, out = _post(server, {"messages": "02/09/2026, 09:12 - Dana Okafor: Can we add an online shop to sell prints?\n"
                                              "02/09/2026, 09:13 - Alex: ok\n", "tone": "firm"}, token="tok")
-    assert status == 200 and out["out_of_scope_count"] == 1
-    [draft_text] = out["drafts"].values()
-    assert draft_text.startswith("> DRAFT") and "billable" in draft_text
-    assert "never sends" in out["note"]
+    assert status == 200 and out["possible_extras_count"] == 1 and "drafts" not in out
+    assert out["possible_extras"][0]["rule"] == "explicit_exclusion"
+    assert out["headline"].startswith("Possible extra work to discuss: 1 items")
+    assert "suggests" in out["note"]
+
+
+def test_server_refuses_multi_sender_without_a_client(srv_noclient):
+    status, out = _post(srv_noclient, {"messages": "02/09/2026, 09:12 - Dana Okafor: Please add a shop.\n"
+                                                  "02/09/2026, 09:13 - Alex Rivera: ok\n"}, token="tok")
+    assert status == 400 and "--client" in out["error"]
 
 
 # ---------------------------------------------------------------- CLI end to end + watch
@@ -293,5 +315,5 @@ def test_watch_scan_once_processes_each_file_once(examples, tmp_path):
     opts = Options(llm=MockLLM(), client=["Dana"])
     assert scan_once(inbox, parse_sow(text), text, opts, tmp_path / "out", seen, logs.append) == 1
     assert scan_once(inbox, parse_sow(text), text, opts, tmp_path / "out", seen, logs.append) == 0
-    assert any("out-of-scope" in line for line in logs)
+    assert any("possible extras" in line for line in logs)
     assert list((tmp_path / "out").glob("chat-*/report.html"))

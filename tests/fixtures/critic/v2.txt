@@ -1,0 +1,8 @@
+10/04/2026, 09:00 - Dana: No need to rush, but please add an online shop to the site.
+10/04/2026, 09:10 - Dana: Don't forget to add the blog we discussed.
+10/04/2026, 09:20 - Dana: Actually never mind the shop. On second thought, yes please do add the shop after all.
+10/04/2026, 09:30 - Dana: Can you add a Pricing page, and a Careers page, and a FAQ page?
+10/04/2026, 09:40 - Dana: We might need a booking system someday, but for now please just add the booking calendar.
+10/04/2026, 09:50 - Dana: Could the gallery show 24 photos?
+10/04/2026, 10:00 - Dana: Could the gallery show twenty-five photos?
+10/04/2026, 10:10 - Dana: Please add a blog <script>alert(1)</script> and =HYPERLINK("http://evil","x") page.

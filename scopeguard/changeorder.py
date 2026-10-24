@@ -23,10 +23,10 @@ def _round_up_quarter(h: float) -> float:
 
 
 def draftable(f: Finding) -> bool:
-    """A change-order draft exists only for a real request that is OUT-OF-SCOPE, cites a clause,
-    and was decided with confidence of at least 0.75. Doubt is never billed."""
-    return (f.cls == "OUT-OF-SCOPE" and bool(f.clause_id) and f.confidence >= MIN_DRAFT_CONFIDENCE
-            and f.request.act == "request" and f.estimate is not None)
+    """An item can be drafted (by `scopeguard bill`, on your say-so) only if it is a Possible extra:
+    a real request, OUT-OF-SCOPE, citing a clause, confidence of at least 0.75, not withdrawn, not
+    waived by you, not dismissed. analyze itself never writes a draft."""
+    return f.status == "extra"
 
 
 def estimate(quote: str, llm_hours: Optional[float], card: RateCard, use_tasks: bool = True) -> dict:
@@ -152,8 +152,8 @@ def draft(f: Finding, card: RateCard, tone: str = "friendly", revision_limit: in
 
 
 def extra_work(findings) -> dict:
-    """Totals over draftable items only (OUT-OF-SCOPE, cited clause, confidence >= 0.75, a real request).
-    Each consolidated item counts once."""
+    """Totals over Possible extras only (OUT-OF-SCOPE, cited clause, confidence >= 0.75, a real request,
+    not withdrawn or waived). Each consolidated item counts once."""
     items = [f for f in findings if draftable(f)]
     hl = sum(f.estimate["hours_low"] for f in items if f.estimate.get("hours") is not None)
     hh = sum(f.estimate["hours_high"] for f in items if f.estimate.get("hours") is not None)
@@ -167,7 +167,7 @@ def extra_work(findings) -> dict:
 def headline(findings, currency: str) -> str:
     t = extra_work(findings)
     if not t["n"]:
-        return "No billable out-of-scope items were found."
+        return "No possible extra work found. Nothing to discuss."
     extra = f", plus {t['fixed']} fixed-price" if t["fixed"] else ""
-    return (f"Estimated extra work (review before sending): {money(t['amount_low'], currency)} to "
-            f"{money(t['amount_high'], currency)} across {t['n']} items ({t['hours_low']:g}-{t['hours_high']:g} h{extra})")
+    return (f"Possible extra work to discuss: {t['n']} items ({money(t['amount_low'], currency)} to "
+            f"{money(t['amount_high'], currency)} if all are confirmed; {t['hours_low']:g}-{t['hours_high']:g} h{extra})")

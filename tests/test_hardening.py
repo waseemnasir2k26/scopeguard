@@ -57,11 +57,11 @@ def test_retractions_and_hypotheticals_are_never_requests_or_billed(sow, text, t
     res = run_chat(sow, [text])                       # even a reckless model cannot bill these
     assert res.findings, "kept visible as UNCLEAR, not silently dropped"
     for f in res.findings:
-        assert f.cls == UNCLEAR and f.rule == "not_a_request" and f.request.act != "request"
+        assert f.cls == UNCLEAR and f.status == "call" and f.rule == "not_a_request" and f.request.act != "request"
         assert not draftable(f) and f.estimate is None
     write_all(res, tmp_path / "o", RateCard())
     assert list((tmp_path / "o" / "change-orders").glob("*.md")) == []
-    assert "No billable" in headline(res.findings, "USD")
+    assert "No possible extra work" in headline(res.findings, "USD")
 
 
 def test_act_detection_does_not_swallow_real_requests():
@@ -121,22 +121,21 @@ def test_numbers_in_requests_are_compared_with_sow_caps(sow, text, cls, rule, cl
 
 
 # ---------------------------------------------------------------- drafts
-def test_draft_only_for_out_with_clause_and_confidence_at_least_075(sow, tmp_path):
+def test_extra_needs_out_clause_confidence_and_a_real_request(sow, tmp_path):
     from scopeguard.models import Finding
+    from scopeguard.status import assign_status
     req = Request(id="Q1", message_id="M1", sender="Dana Okafor", ts=None, quote="Can you add a podcast page?")
     base = dict(id="REQ-01", request=req, cls=OUT_OF_SCOPE, confidence=0.9, clause_id="C1")
     f = Finding(**base)
     f.estimate = {"hours": 1}
-    assert draftable(f)
+    assert assign_status(f) == "extra" and draftable(f)
     for change in (dict(confidence=0.7), dict(clause_id=None), dict(cls=UNCLEAR)):
         g = Finding(**{**base, **change})
         g.estimate = {"hours": 1}
-        assert not draftable(g), change
-    # end to end: a model that says OUT at 0.7 produces no draft file
-    res = run_chat(sow, ["Could you add a podcast player somewhere?"], llm=always_out("OUT-OF-SCOPE", "C1", 0.7))
-    assert res.findings[0].cls == OUT_OF_SCOPE and not draftable(res.findings[0])
-    write_all(res, tmp_path / "o", RateCard())
-    assert list((tmp_path / "o" / "change-orders").glob("*.md")) == []
+        assert assign_status(g) != "extra" and not draftable(g), change
+    # end to end: a model that says OUT at 0.7 is Needs your call, not a possible extra
+    res = run_chat(sow, ["Could you add a podcast player somewhere?"], llm=always_out("OUT-OF-SCOPE", "C12", 0.7))
+    assert res.findings[0].status == "call" and not draftable(res.findings[0])
 
 
 def test_draft_opens_with_a_soft_check_and_hedges_revision_counts(sow):

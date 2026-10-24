@@ -1,9 +1,9 @@
 {
-  "name": "scopeguard: client email to scope check to DRAFT alert",
+  "name": "scopeguard: client email to possible-extras alert (no drafts, nothing sent)",
   "nodes": [
     {
       "parameters": {
-        "content": "## scopeguard (drafts only)\n1. Create a Gmail label for ONE client and put its id in the trigger filter.\n2. Run `scopeguard serve --sow sow.md --rates rates.yaml --client \"Client Name\"` on a machine this n8n can reach (127.0.0.1 if n8n runs on the same box).\n3. Create a Header Auth credential `Authorization: Bearer <token>` when the server is not loopback-only.\n4. Nothing in this workflow sends mail to the client. The Gmail node only CREATES A DRAFT in your own mailbox; the Slack node posts an internal alert.\n5. LLM judgement is a draft. You decide what to raise.",
+        "content": "## scopeguard (suggests; you decide)\n1. Create a Gmail label for ONE client and put its id in the trigger filter.\n2. Run `scopeguard serve --sow sow.md --rates rates.yaml --client \"Client Full Name\"` on a machine this n8n can reach (127.0.0.1 if same box).\n3. Create a Header Auth credential `Authorization: Bearer <token>` when the server is not loopback-only.\n4. This workflow only POSTS the email text to scopeguard and posts an INTERNAL Slack alert listing possible extras. It writes no change-order drafts and sends nothing to the client.\n5. To draft a change order for an item you agree with, run `scopeguard bill <id>` yourself.",
         "height": 260,
         "width": 480
       },
@@ -11,22 +11,41 @@
       "name": "Read me",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-120, -140]
+      "position": [
+        -120,
+        -140
+      ]
     },
     {
       "parameters": {
-        "pollTimes": { "item": [{ "mode": "everyMinute" }] },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
         "simple": false,
-        "filters": { "labelIds": ["REPLACE_WITH_CLIENT_LABEL_ID"] },
+        "filters": {
+          "labelIds": [
+            "REPLACE_WITH_CLIENT_LABEL_ID"
+          ]
+        },
         "options": {}
       },
       "id": "a1000000-0000-4000-8000-000000000002",
       "name": "Gmail Trigger (client label)",
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
-      "position": [0, 200],
+      "position": [
+        0,
+        200
+      ],
       "credentials": {
-        "gmailOAuth2": { "id": "REPLACE_ME", "name": "Gmail account" }
+        "gmailOAuth2": {
+          "id": "REPLACE_ME",
+          "name": "Gmail account"
+        }
       }
     },
     {
@@ -37,7 +56,10 @@
       "name": "Code (build request)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [240, 200]
+      "position": [
+        240,
+        200
+      ]
     },
     {
       "parameters": {
@@ -47,16 +69,24 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ messages: $json.messages, format: $json.format, tone: 'friendly' }) }}",
-        "options": { "timeout": 600000 }
+        "jsonBody": "={{ JSON.stringify({ messages: $json.messages, format: $json.format, client: ['REPLACE_WITH_CLIENT_FULL_NAME'], tone: 'friendly' }) }}",
+        "options": {
+          "timeout": 600000
+        }
       },
       "id": "a1000000-0000-4000-8000-000000000004",
       "name": "scopeguard /analyze",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 200],
+      "position": [
+        480,
+        200
+      ],
       "credentials": {
-        "httpHeaderAuth": { "id": "REPLACE_ME", "name": "scopeguard token" }
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "scopeguard token"
+        }
       }
     },
     {
@@ -70,9 +100,12 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.out_of_scope_count }}",
+              "leftValue": "={{ $json.possible_extras_count }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "combinator": "and"
@@ -80,10 +113,13 @@
         "options": {}
       },
       "id": "a1000000-0000-4000-8000-000000000005",
-      "name": "Any out-of-scope?",
+      "name": "Any possible extras?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 200]
+      "position": [
+        720,
+        200
+      ]
     },
     {
       "parameters": {
@@ -93,56 +129,64 @@
           "value": "REPLACE_WITH_CHANNEL_ID",
           "mode": "id"
         },
-        "text": "={{ ':warning: DRAFT scope alert: ' + $json.out_of_scope_count + ' out-of-scope request(s) in \"' + $('Code (build request)').item.json.subject + '\". Nothing was sent. First draft:\\n' + Object.values($json.drafts)[0].slice(0, 1500) }}",
+        "text": "={{ ':mag: scopeguard: ' + $json.headline + ' in \"' + $('Code (build request)').item.json.subject + '\". Nothing was drafted or sent.\\n' + $json.possible_extras.map(x => '- ' + x.quote + ' [' + (x.clause_id || 'no clause') + ', ' + x.fingerprint + ']').join('\\n') }}",
         "otherOptions": {}
       },
       "id": "a1000000-0000-4000-8000-000000000006",
-      "name": "Slack: draft alert (internal)",
+      "name": "Slack: possible extras (internal)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
-      "position": [960, 120],
+      "position": [
+        960,
+        120
+      ],
       "credentials": {
-        "slackApi": { "id": "REPLACE_ME", "name": "Slack account" }
-      }
-    },
-    {
-      "parameters": {
-        "resource": "draft",
-        "operation": "create",
-        "subject": "={{ 'DRAFT change order: ' + $('Code (build request)').item.json.subject }}",
-        "message": "={{ Object.values($json.drafts).join('\\n\\n----------\\n\\n') }}",
-        "options": { "sendTo": "REPLACE_WITH_YOUR_OWN_EMAIL" }
-      },
-      "id": "a1000000-0000-4000-8000-000000000007",
-      "name": "Gmail: create DRAFT in my mailbox",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [960, 300],
-      "credentials": {
-        "gmailOAuth2": { "id": "REPLACE_ME", "name": "Gmail account" }
+        "slackApi": {
+          "id": "REPLACE_ME",
+          "name": "Slack account"
+        }
       }
     }
   ],
   "connections": {
     "Gmail Trigger (client label)": {
-      "main": [[{ "node": "Code (build request)", "type": "main", "index": 0 }]]
-    },
-    "Code (build request)": {
-      "main": [[{ "node": "scopeguard /analyze", "type": "main", "index": 0 }]]
-    },
-    "scopeguard /analyze": {
-      "main": [[{ "node": "Any out-of-scope?", "type": "main", "index": 0 }]]
-    },
-    "Any out-of-scope?": {
       "main": [
         [
           {
-            "node": "Slack: draft alert (internal)",
+            "node": "Code (build request)",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Code (build request)": {
+      "main": [
+        [
           {
-            "node": "Gmail: create DRAFT in my mailbox",
+            "node": "scopeguard /analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scopeguard /analyze": {
+      "main": [
+        [
+          {
+            "node": "Any possible extras?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any possible extras?": {
+      "main": [
+        [
+          {
+            "node": "Slack: possible extras (internal)",
             "type": "main",
             "index": 0
           }
@@ -151,8 +195,12 @@
       ]
     }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "active": false,
   "pinData": {},
-  "meta": { "templateCredsSetupCompleted": false }
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
 }

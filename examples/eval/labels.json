@@ -186,7 +186,7 @@
   {
    "id": "L29",
    "text": "Can you add a members area where clients log in?",
-   "expect": "OUT-OF-SCOPE",
+   "expect": "UNCLEAR",
    "tag": "silent"
   },
   {
@@ -362,6 +362,126 @@
    "text": "Could the gallery show 24 photos?",
    "expect": "IN-SCOPE",
    "tag": "numeric"
+  },
+  {
+   "id": "L59",
+   "text": "Could you add a blog? Actually never mind, forget it.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L60",
+   "text": "Please add a newsletter signup. On second thought, let's not.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L61",
+   "text": "If the budget allows, maybe a members area where clients log in.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L62",
+   "text": "Could you add a Spanish version if we have money left?",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L63",
+   "text": "Should the budget stretch, please add an online shop.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L64",
+   "text": "Oh sure, let's add a blog, a shop and a booking system while we're at it, why not.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L65",
+   "text": "I sent 40 photos, please use the best 20 in the gallery.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L66",
+   "text": "I have 100 photos but only want 10 in the gallery.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L67",
+   "text": "Please use the logo I designed.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L68",
+   "text": "I've written the copy, can you put it on the Services page?",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L69",
+   "text": "Can the enquiries go to sales@harborlight.example and support@harborlight.example and info@harborlight.example?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L70",
+   "text": "Can you add a couple more email addresses to the contact form?",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L71",
+   "text": "Could the gallery show twenty-five photos?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L72",
+   "text": "No need to rush, but please add an online shop to the site.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L73",
+   "text": "Don't forget to add the blog we discussed.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L74",
+   "text": "We'd love a live chat widget on every page.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L75",
+   "text": "Please add our Twitter link in the footer.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L76",
+   "text": "Please add the page titles for each page.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L77",
+   "text": "Would it be possible to add a booking calendar? No pressure at all.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
+  },
+  {
+   "id": "L78",
+   "text": "Do not add the newsletter, we have decided against it.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial2"
   }
  ]
 }

@@ -35,8 +35,8 @@ def scan_once(folder: Path, sow, sow_text: str, opts: Options, out_root: Path, s
             res = analyze(sow, messages=msgs, opts=opts, sow_text=sow_text)
             dest = out_root / f"{p.stem}-{datetime.now():%Y%m%d-%H%M%S}"
             write_all(res, dest, opts.rates, opts.tone)
-            outs = sum(1 for f in res.findings if f.cls == "OUT-OF-SCOPE")
-            log(f"[watch] {p.name}: {len(res.findings)} requests, {outs} out-of-scope -> {dest}")
+            outs = sum(1 for f in res.findings if f.status == "extra")
+            log(f"[watch] {p.name}: {len(res.findings)} items, {outs} possible extras -> {dest}")
         except Exception as e:  # one bad file must not stop the watcher
             log(f"[watch] {p.name}: skipped ({type(e).__name__}: {e})")
         seen[p.name] = k
@@ -48,6 +48,8 @@ def watch(folder: str | Path, sow, sow_text: str, opts: Options, out_root: str |
           once: bool = False, log: Callable[[str], None] = print) -> None:
     folder, out_root = Path(folder), Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
+    from .ledger import Ledger
+    opts.ledger = Ledger(out_root / "ledger.json")
     state = out_root / ".watch-state.json"
     try:
         seen = json.loads(state.read_text(encoding="utf-8"))

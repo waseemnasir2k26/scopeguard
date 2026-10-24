@@ -160,10 +160,10 @@ def test_mock_llm_classification_mix():
 
 def test_json_extraction_and_retry():
     assert extract_json('Sure!\n```json\n{"a": {"b": "}"}}\n``` bye') == {"a": {"b": "}"}}
-    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C1", "confidence": 0.8, "reason": "r",
+    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C4", "confidence": 0.8, "reason": "r",
                        "estimated_hours": 2, "title": "t"})
     llm = FakeLLM(replies=["I think it is out of scope", good])
-    [f] = classify_all([rq(1, "M1", "Please add a podcast page for us.", rev=False)], SOW, llm)
+    [f] = classify_all([rq(1, "M1", "Can you post our weekly update?", rev=False)], PAGES_SOW, llm)
     assert f.cls == OUT_OF_SCOPE and len(llm.prompts) == 2
     assert "not valid JSON" in llm.prompts[1]
 
@@ -249,12 +249,12 @@ def test_headline_counts_each_consolidated_item_once_and_gives_a_range():
     card = RateCard(hourly_rate=100)
     r = rq(1, "M1", "Could we also have a blog?", rev=False)
     r.extra_quotes = ["I'd like you to set it up and write the first three posts."]
-    f = Finding(id="REQ-01", request=r, cls=OUT_OF_SCOPE, confidence=0.9, clause_id="C5")
+    f = Finding(id="REQ-01", request=r, cls=OUT_OF_SCOPE, confidence=0.9, clause_id="C5", status="extra")
     f.estimate = estimate(r.text(), 4, card)
     nocite = Finding(id="REQ-02", request=rq(2, "M2", "Add a podcast", rev=False), cls=OUT_OF_SCOPE, confidence=0.9)
     nocite.estimate = estimate("x", 10, card)
     h = headline([f, nocite], "USD")
-    assert h.startswith("Estimated extra work (review before sending): $300.00 to $600.00 across 1 items (3-6 h")
+    assert h.startswith("Possible extra work to discuss: 1 items ($300.00 to $600.00 if all are confirmed; 3-6 h")
 
 
 def test_eval_rules_only_gets_every_revision_case_right(examples):

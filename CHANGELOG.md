@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0 - 2026-10-25
+
+Structural change: scopeguard suggests, you decide.
+
+- `analyze` never writes change-order drafts. Items are sorted into Possible extras / Needs your call / In scope / Set aside. Headline: "Possible extra work to discuss: N items ($A to $B if all are confirmed)".
+- New `scopeguard bill <id>...` (or `--all-strong` with a y/N listing) drafts change orders for the items you choose; `scopeguard dismiss <id>` records "not an extra". Decisions persist in a lock-protected, atomically written `ledger.json`; item ids are stable fingerprints.
+- Stateful withdrawal: a retraction in the same message or any later message that references an item withdraws it. Conditionals, hedges, sarcasm and conflicting statements are "Needs your call". Freelancer free offers ("on the house", "no extra charge") mark items included by you.
+- `--client` is required for multi-sender exports and matched on whole name tokens; no guessing from the SOW.
+- Caps: the most relevant cap only, "minimum" and "per row" are not caps, supplied totals ("40 photos, use the best 20") are not requests, number words / hyphenated / dozens, "a couple/a few/N more" are not priced, literal email addresses are counted.
+- SOW exceptions inside exclusions ("except one launch post, which is included"); client-authored assets ("the logo I designed").
+- LLM trust: an OUT verdict must cite an exclusion the request mentions; citing a deliverable contradicts the SOW; IN verdicts need support too.
+- "Skipped" sentences are counted and listed, never dropped silently. Simple deliverables ("page titles", "social links in the footer") are matched in rules-only mode.
+- Eval: 78 labelled items plus a 20-item held-out set; the two critics' probe files are in the tests (172 tests).
+- n8n example sends an internal Slack alert only (no Gmail draft node).
+
 ## 1.0.0 - 2026-10-25
 
 First release.

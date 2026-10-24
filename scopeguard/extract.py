@@ -14,58 +14,39 @@ from datetime import datetime
 from typing import Iterable, Optional
 
 from .models import Message, Request
+from .acts import classify_act
 from .textutil import concepts, normalize
 
 _IMPERATIVE = (r"^(?:(?:also|and|then|plus|so|ok|okay|sorry|actually)[,!.]?\s+)*(?:please\s+)?"
                r"(?:add|make|change|move|swap|fix|update|install|create|build|set ?up|connect|put|use|place|"
                r"include|send|write|translate|remove|replace|adjust|tweak|rename|resize|redo|try|show|embed|link|"
-               r"design|shoot|publish|upload|integrate|schedule|post)\b")
+               r"design|shoot|publish|upload|integrate|schedule|post|record|drop)\b")
 _CUES = re.compile(
     r"\b(can|could|would|will) (you|we|u|the|this|that|it|our|my|there)\b|\bplease\b|\bpls\b|"
     r"\bwe (need|want|would like|'d like)\b|\bi (need|want|would like|'d like|wanna)\b|\bi'?d like\b|"
+    r"\bwe'?d (?:love|like)\b|\bwould (?:love|like)\b|\bdon'?t forget\b|\bhoping\b|"
     r"\b(also|additionally|one more thing|by the way|btw|while you'?re at it|on top of that)\b|"
     r"\bit would be (nice|great|good|helpful)\b|\bwhat about\b|\bhow about\b|\blet'?s (add|have|do|try)\b|"
     r"\bmake (it|the|sure|them|this)\b|\bchange\b|\bneeds?\b|\bwants?\b|\bswap\b|\breplace\b|\bmove\b|"
-    r"\bwould love\b|" + _IMPERATIVE.replace("^", r"(?:^|[.!?]\s+)"), re.I)
+    + _IMPERATIVE.replace("^", r"(?:^|[.!?]\s+)"), re.I)
 _SKIP = re.compile(
     r"^(thanks|thank you|thx|ok(ay)?|great|perfect|nice|cool|sounds good|looks (great|good)|love it|got it|"
     r"yes|yep|no problem|hi|hello|hey|good (morning|evening)|will do)\b[^?]*$", re.I)
 _STATUS = re.compile(r"\b(when will|any update|how long|what'?s the (status|eta)|did you (get|receive|see)|are you (there|free|available))\b", re.I)
 _ADMIN = re.compile(r"\b(invoice|invoices|receipt|bank details|payment schedule)\b", re.I)   # billing admin, not scope
 
-_RETRACT = re.compile(
-    r"\b(?:don'?t|do not|dont)\s+(?:add|need|want|include|build|make|do|bother|worry)\b|\bno need\b|\bnever ?mind\b|"
-    r"\bchang(?:ed|ing) (?:my|our) minds?\b|\bcancel (?:that|this|it)\b|\bscrap (?:that|this|it)\b|"
-    r"\bforget (?:it|that|about)\b|\bignore (?:that|my|the last)\b|\bnot needed\b|\bwe don'?t need\b|"
-    r"\bno longer (?:need|want)\b|\bnot after all\b|\bwithdraw\b|\bleave (?:it|that) out\b", re.I)
-_HYPO = re.compile(
-    r"\bjust curious\b|\bout of curiosity\b|\bmaybe (?:later|someday|one day|in (?:the )?future)\b|"
-    r"\bthinking (?:about|of)\b|\bwondering (?:if|whether|how)\b|\bin the future\b|\bsome ?day\b|\bone day\b|"
-    r"\bat some point\b|\bfor later\b|\bhow much (?:would|does|do|is|will)\b|\bwhat would (?:it|that|this) cost\b|"
-    r"\bwhat'?s the (?:price|cost|rate)\b|\b(?:do|does) (?:you|your team)(?: also| guys)? "
-    r"(?:do|offer|have|provide|handle|build|make|sell)\b|\bare you (?:able|capable)\b|\bif (?:we|i) (?:ever|wanted|decide)\b|"
-    r"\bwe might\b", re.I)
-
 _REV_CUE = re.compile(
     r"\b(change|changing|tweak|adjust|revise|modify|redo|rework|swap|replace|recolou?r|rename|reposition|resize|"
     r"move|bigger|smaller|larger|darker|lighter|brighter|font|colou?r|instead of|different (colou?r|font|image|photo|layout|"
     r"order)|order of|typo|typos|fix|correct|spelling|reword|shorten|lengthen|spacing|padding|margin|align(ed|ment)?|"
-    r"position|reorder|rearrange|enlarge|shrink|text size|headline|heading)\b", re.I)
+    r"position|reorder|rearrange|enlarge|shrink|text size|headline|heading|increase|decrease|reduce|raise|lower|"
+    r"widen|narrow|taller|shorter|wider|thicker|thinner|bolder)\b", re.I)
 _NEW_CUE = re.compile(
     r"\b(add|adding|new|build|create|set ?up|integrate|connect|write|translate|install|launch|start|include|"
     r"also (want|need)|plus)\b", re.I)
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
 _WORD = re.compile(r"\w+")
-
-
-def classify_act(text: str) -> str:
-    """request | retracted | hypothetical. Doubt is not a request."""
-    if _RETRACT.search(text):
-        return "retracted"
-    if _HYPO.search(text):
-        return "hypothetical"
-    return "request"
 
 
 def is_revision(text: str) -> bool:
@@ -81,21 +62,32 @@ def split_sentences(text: str) -> list[str]:
     return out
 
 
-def heuristic_requests(messages: Iterable[Message]) -> list[Request]:
+def extract_requests(messages: Iterable[Message]) -> tuple[list[Request], list[dict]]:
+    """Candidate requests plus the sentences that were skipped on purpose (never silently):
+    pleasantries, status questions and billing admin."""
     out: list[Request] = []
+    skipped: list[dict] = []
     for m in messages:
         for sent in split_sentences(m.text):
             act = classify_act(sent)
-            if _SKIP.match(sent) or _STATUS.search(sent) or _ADMIN.search(sent):
+            why = ("pleasantry" if (_SKIP.match(sent) and len(sent.split()) <= 6) else "status question" if _STATUS.search(sent)
+                   else "billing admin" if _ADMIN.search(sent) else "")
+            if why:
+                if _CUES.search(sent) or act != "request":
+                    skipped.append({"quote": sent, "why": why, "message": m.id})
                 continue
-            if len(sent.split()) < 4:
+            if len(sent.split()) < 2:
                 continue
-            # a retraction or a hypothetical is kept (as UNCLEAR, never billed) even without a request cue
+            # a retraction, hedge or hypothetical is kept (as UNCLEAR, never billed) even without a request cue
             if act == "request" and not _CUES.search(sent):
                 continue
             out.append(Request(id="", message_id=m.id, sender=m.sender, ts=m.ts, quote=sent,
                                is_revision=is_revision(sent) and act == "request", act=act))
-    return out
+    return out, skipped
+
+
+def heuristic_requests(messages: Iterable[Message]) -> list[Request]:
+    return extract_requests(messages)[0]
 
 
 # ---------------------------------------------------------------- evidence rule (indexed)
@@ -258,6 +250,7 @@ def consolidate_findings(findings: list, messages: list, sow) -> list:
         if f.request.act == "request":
             for k in reversed(kept[-WINDOW_MESSAGES:]):
                 if (k.request.act == "request" and k.cls == f.cls and kind(k) == kind(f)
+                        and bool(k.request.withdrawn_by) == bool(f.request.withdrawn_by)
                         and _same_intent(k.request, f.request, order)):
                     target = k
                     break

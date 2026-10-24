@@ -43,7 +43,7 @@ _CONCEPT_GROUPS = {
                    "spanish french german arabic italian portuguese urdu hindi",
     "logo": "logo logos brand branding identity rebrand",
     "production": "photography photographer photoshoot shoot video videos footage film drone",
-    "seo": "seo backlink backlinks ranking rank keyword keywords",
+    "seo": "seo backlink backlinks ranking rank keyword keywords title titles meta metadata",
     "ads": "ads ad advertising ppc campaign campaigns adwords paid",
     "hosting": "hosting domain domains dns renewal",
     "booking": "booking bookings appointment appointments reservation reservations calendly",
@@ -53,7 +53,7 @@ _CONCEPT_GROUPS = {
     "app": "app apps android ios",
     "analytics": "analytics ga4 tracking pixel",
     "responsive": "responsive mobile phone phones tablet iphone",
-    "form": "form forms enquiry inquiry",
+    "form": "form forms enquiry enquiries inquiry inquiries",
     "gallery": "gallery galleries",
     "image": "image images photo photos picture pictures photograph photographs",
     "membership": "login logins member members membership account accounts",
@@ -116,7 +116,7 @@ def slug(text: str, n: int = 40) -> str:
     return (s[:n].strip("-")) or "request"
 
 
-_PHRASE_SPLIT = re.compile(r"[,;/()]|\b(?:or|and|including|such as|for example|e\.g\.)\b", re.I)
+_PHRASE_SPLIT = re.compile(r"[,;:/()]|\b(?:or|and|including|such as|for example|e\.g\.)\b", re.I)
 
 
 def phrases(text: str) -> list[str]:

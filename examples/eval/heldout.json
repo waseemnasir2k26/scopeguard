@@ -1,0 +1,128 @@
+{
+ "note": "Held-out set: 20 requests written before the rules were extended and never used to tune them.",
+ "items": [
+  {
+   "id": "H01",
+   "text": "Can you rename the Services tab to What We Do?",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "H02",
+   "text": "Please replace the banner photo with the sunset one.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 2
+  },
+  {
+   "id": "H03",
+   "text": "Increase the size of the contact button.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "revision",
+   "round": 3
+  },
+  {
+   "id": "H04",
+   "text": "Could you add an online store with Stripe checkout?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H05",
+   "text": "We need a podcast episode list page.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "page"
+  },
+  {
+   "id": "H06",
+   "text": "Please set up our newsletter with ConvertKit.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H07",
+   "text": "Can you translate the site into German?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H08",
+   "text": "Can you write our About text? We are struggling with the wording.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H09",
+   "text": "Forget the blog idea, we are good without it.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "H10",
+   "text": "If there is money left over, a booking system would be great.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "H11",
+   "text": "Out of curiosity, what would a members area cost?",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "H12",
+   "text": "Please use the pictures I attached in the gallery.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial"
+  },
+  {
+   "id": "H13",
+   "text": "Could the portfolio show 25 pictures?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "numeric"
+  },
+  {
+   "id": "H14",
+   "text": "Please make the whole site load quickly on slow connections.",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "H15",
+   "text": "Please add our LinkedIn and YouTube icons to the footer.",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "H16",
+   "text": "Could you add meta descriptions to every page?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "H17",
+   "text": "Maybe we could do a shop in phase two.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "H18",
+   "text": "Can you also manage our Google Ads next month?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H19",
+   "text": "We would like monthly maintenance after the launch.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "H20",
+   "text": "Can the contact form notify three email addresses?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "numeric"
+  }
+ ]
+}

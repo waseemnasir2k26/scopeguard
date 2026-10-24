@@ -7,11 +7,10 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .changeorder import draft, draftable
+from .changeorder import headline
 from .messages import parse_text_blob
-from .models import OUT_OF_SCOPE
 from .outputs import to_dict
-from .pipeline import Options, analyze
+from .pipeline import ClientError, Options, analyze
 
 MAX_BODY = 1_000_000
 
@@ -113,13 +112,17 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
             try:
                 with lock:
                     res = analyze(sow, messages=msgs, opts=o, sow_text=sow_text)
+            except ClientError as e:
+                return self._send(400, {"error": str(e)})
             except Exception as e:  # report, never crash the server
                 return self._send(500, {"error": f"analysis failed: {type(e).__name__}"})
             out = to_dict(res)
-            drafts = {f.id: draft(f, opts.rates, tone, sow.revision_limit) for f in res.findings if draftable(f)}
-            out["drafts"] = drafts
-            out["out_of_scope_count"] = len(drafts)
-            out["note"] = "Drafts only. scopeguard never sends anything."
+            extras = [f for f in out["findings"] if f["status"] == "extra"]
+            out["possible_extras"] = extras
+            out["possible_extras_count"] = len(extras)
+            out["headline"] = headline(res.findings, opts.rates.currency)
+            out["note"] = ("scopeguard suggests; you decide. No drafts are written by the server: "
+                           "run `scopeguard bill <id>` locally for the items you agree with.")
             self._send(200, out)
 
     return ThreadingHTTPServer((host, port), H)

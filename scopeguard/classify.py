@@ -88,6 +88,14 @@ def _ask(req: Request, sow: Sow, llm, redact_fn, min_confidence: float) -> dict:
                 "hours": None, "title": "", "notes": ["llm error"]}
 
 
+def fingerprint(req: Request) -> str:
+    """A stable id for an item: who said it, when, and the wording. Survives re-runs on a growing export."""
+    import hashlib
+    from .textutil import normalize
+    raw = f"{req.sender}|{req.ts or ''}|{normalize(req.quote)}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
+
+
 def short_title(quote: str, limit: int = 60) -> str:
     """A readable title that never cuts a quotation in half."""
     t = " ".join(quote.replace('"', "").replace("“", "").replace("”", "").split()).rstrip("?.! ")
@@ -99,13 +107,14 @@ def short_title(quote: str, limit: int = 60) -> str:
 def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidence: float,
                  state: Optional[dict] = None) -> Finding:
     f = Finding(id=f"REQ-{idx:02d}", request=req, cls=UNCLEAR, confidence=0.0)
+    f.fingerprint = fingerprint(req)
     default_title = short_title(req.quote)
     rule = precheck(req, sow, state)                # 1. deterministic layer, final
     if rule is not None:
         clause = rule["clause"]
         f.cls, f.confidence, f.reason, f.rule = rule["cls"], rule["confidence"], rule["reason"], rule["rule"]
         if clause:
-            f.clause_id, f.clause_text, f.clause_ref = clause.id, clause.text, clause.ref
+            f.clause_id, f.clause_text, f.clause_ref, f.clause_kind = clause.id, clause.text, clause.ref, clause.kind
         hours, title = None, ""
         # the model only proposes hours and a title here; revision overages use the rate-card default
         if f.cls == OUT_OF_SCOPE and llm is not None and f.rule != "revision_limit":
@@ -119,16 +128,34 @@ def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidenc
     f.llm_class = v["cls"]
     f.title = v["title"] or default_title
     if v["clause"]:
-        f.clause_id, f.clause_text, f.clause_ref = v["clause"].id, v["clause"].text, v["clause"].ref
+        c = v["clause"]
+        f.clause_id, f.clause_text, f.clause_ref, f.clause_kind = c.id, c.core_text() if c.kind == "exclusion" else c.text, c.ref, c.kind
     f.estimate = {"llm_hours": v["hours"]}
-    # support check: an OUT verdict that cites an exclusion must share words or a phrase with it
-    if f.cls == OUT_OF_SCOPE and v["clause"] is not None and v["clause"].kind == "exclusion"             and overlap(req.text(), v["clause"].text) == 0:
-        f.notes.append(f"model cited exclusion {v['clause'].id} but the request doesn't mention it; downgraded to UNCLEAR")
-        f.reason = (f"Model cited exclusion {v['clause'].id} but the request doesn't mention it. "
-                    f"(Model said: {f.reason})")[:600]
-        f.cls, f.confidence = UNCLEAR, min(f.confidence, 0.4)
-        f.clause_id, f.clause_text, f.clause_ref = None, "", ""
+    _trust_check(f, req)
     return f
+
+
+def _trust_check(f: Finding, req: Request) -> None:
+    """The model's citation is evidence, not a verdict. An LLM OUT is valid only if it cites an EXCLUSION
+    clause the request actually mentions; citing a deliverable (or anything else) contradicts the SOW and
+    is how an injected message would turn included work into a bill. An IN must also be supported by its
+    clause. Failures become UNCLEAR with the reason shown."""
+    text = req.text()
+    why = ""
+    from .models import Clause  # noqa: F401  (type only)
+    if f.cls == OUT_OF_SCOPE and f.clause_id:
+        kind = f.clause_kind
+        if kind != "exclusion":
+            why = f"model contradicted a {kind} clause ({f.clause_id}); an OUT verdict must rest on an exclusion"
+        elif overlap(text, f.clause_text) == 0:
+            why = f"model cited exclusion {f.clause_id} but the request doesn't mention it"
+    elif f.cls == IN_SCOPE and f.clause_id and overlap(text, f.clause_text) == 0:
+        why = f"model cited {f.clause_id} but the request doesn't mention it"
+    if why:
+        f.notes.append(why + "; downgraded to UNCLEAR")
+        f.reason = (why[0].upper() + why[1:] + f". (Model said: {f.reason})")[:600]
+        f.cls, f.confidence = UNCLEAR, min(f.confidence, 0.4)
+        f.clause_id, f.clause_text, f.clause_ref, f.clause_kind = None, "", "", ""
 
 
 def classify_all(requests: list[Request], sow: Sow, llm, redact_fn=lambda s: s, min_confidence: float = 0.5,

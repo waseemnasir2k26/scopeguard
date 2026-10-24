@@ -8,7 +8,8 @@ from pathlib import Path
 
 from . import __version__
 from .llm import LLMError, make_backend
-from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
+from .changeorder import headline
+from .ledger import Ledger
 from .outputs import counts, write_all
 from .pipeline import Options, analyze
 from .rates import SAMPLE, load_rates
@@ -21,7 +22,8 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--llm", default="auto", help="auto (local Ollama), ollama, groq, gemini, mock (offline demo) or none (rules only)")
     p.add_argument("--model", help="override the model name for the chosen backend")
     p.add_argument("--allow-cloud", action="store_true", help="let --llm auto fall back to Groq/Gemini (sends text off this machine)")
-    p.add_argument("--client", action="append", default=[], help="client's sender name (repeatable)")
+    p.add_argument("--client", action="append", default=[], help="the client's name, matched on whole name tokens "
+                   "(repeatable). Required when the export has several senders")
     p.add_argument("--me", action="append", default=[], help="your own sender name to ignore (repeatable)")
     p.add_argument("--tone", choices=["friendly", "neutral", "firm"], default="friendly")
     p.add_argument("--redact", action="store_true", help="mask emails and phone numbers before any LLM call")
@@ -52,14 +54,44 @@ def cmd_analyze(args) -> int:
         print(f"  [{i}/{n}] {f.cls:12s} {f.confidence:.2f}  {f.request.quote[:70]}", file=sys.stderr)
 
     opts.progress = prog
+    opts.ledger = Ledger(Path(args.out) / "ledger.json")
     res = analyze(sow, args.messages, opts, sow_text=sow_text, fmt=args.format)
     out = write_all(res, args.out, opts.rates, args.tone)
     c = counts(res)
     for w in res.warnings:
         print(f"warning: {w}", file=sys.stderr)
-    print(f"{len(res.findings)} requests: {c[IN_SCOPE]} in-scope, {c[OUT_OF_SCOPE]} out-of-scope, {c[UNCLEAR]} unclear "
-          f"({res.meta['seconds']} s, {res.meta['llm']})")
-    print(f"wrote {out / 'report.html'}, summary.md, scope-log.csv, change-orders/ (drafts, never sent)")
+    print(f"{len(res.findings)} items: {c['extra']} possible extras, {c['call']} need your call, {c['in']} in scope, "
+          f"{c['set_aside']} set aside ({res.meta['seconds']} s, {res.meta['llm']})")
+    print(headline(res.findings, opts.rates.currency))
+    print(f"wrote {out / 'report.html'}, summary.md, scope-log.csv, findings.json. No drafts were written: "
+          f"`scopeguard bill <id> --out {args.out}` drafts one when you agree.")
+    return 0
+
+
+def cmd_bill(args) -> int:
+    from .bill import bill, load_findings
+    card = load_rates(args.rates)
+
+    def confirm(items):
+        print("Strong possible extras:")
+        for f in items:
+            e = f.estimate or {}
+            print(f"  {f.fingerprint}  {f.request.quote[:70]!r}  ({f.clause_id}, {f.rule or 'model'}, "
+                  f"{e.get('amount_low', '?')}-{e.get('amount_high', '?')} {e.get('currency', '')})")
+        if args.yes:
+            return True
+        return input(f"Draft change orders for these {len(items)} items? [y/N] ").strip().lower() in ("y", "yes")
+
+    written = bill(args.out, args.items, card, args.tone, all_strong=args.all_strong, confirm=confirm)
+    for p in written:
+        print(f"drafted {p} (never sent; review and edit before you use it)")
+    return 0
+
+
+def cmd_dismiss(args) -> int:
+    from .bill import dismiss
+    for f in dismiss(args.out, args.items):
+        print(f"dismissed {f.id} {f.fingerprint}: it will not come back on the next analyze")
     return 0
 
 
@@ -151,6 +183,20 @@ def main(argv=None) -> int:
     s.add_argument("--token", help="required for non-loopback hosts (or set SCOPEGUARD_TOKEN)")
     s.add_argument("--allowed-host", action="append", default=[], help="extra Host header value to accept (repeatable)")
     s.set_defaults(fn=cmd_serve)
+
+    b = sub.add_parser("bill", help="draft change orders for the items you choose (analyze never does)")
+    b.add_argument("items", nargs="*", help="item ids from the report (fingerprint or REQ-nn)")
+    b.add_argument("--out", default="out")
+    b.add_argument("--rates")
+    b.add_argument("--tone", choices=["friendly", "neutral", "firm"], default="friendly")
+    b.add_argument("--all-strong", action="store_true", help="list the strong possible extras and ask y/N")
+    b.add_argument("--yes", action="store_true", help="with --all-strong: skip the y/N prompt")
+    b.set_defaults(fn=cmd_bill)
+
+    d = sub.add_parser("dismiss", help="record that an item is not an extra, so it does not come back")
+    d.add_argument("items", nargs="+")
+    d.add_argument("--out", default="out")
+    d.set_defaults(fn=cmd_dismiss)
 
     e = sub.add_parser("eval", help="measure accuracy on a labelled request set (see examples/eval/labels.json)")
     e.add_argument("--sow", required=True)
