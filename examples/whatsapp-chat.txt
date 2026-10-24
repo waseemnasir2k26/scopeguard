@@ -1,0 +1,27 @@
+02/09/2026, 09:12 - Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
+02/09/2026, 09:12 - Dana Okafor: Morning Alex! The kickoff call was great, thanks.
+02/09/2026, 09:14 - Alex Rivera: Glad to hear it. First design drafts will be with you by Friday.
+02/09/2026, 09:20 - Dana Okafor: Could you also add a "Meet the Team" section to the About page? We have four people.
+02/09/2026, 09:22 - Dana Okafor: And please make sure the whole site works well on phones.
+03/09/2026, 16:40 - Dana Okafor: One more thing, can we add an online shop so people can buy our prints?
+03/09/2026, 16:42 - Alex Rivera: Let me look at what that involves and come back to you.
+04/09/2026, 10:05 - Dana Okafor: Can you write the text for the Services page? I'm not great with words.
+04/09/2026, 10:07 - Dana Okafor: Also please install Google Analytics so we can see our visitors.
+04/09/2026, 10:08 - Dana Okafor: <Media omitted>
+07/09/2026, 11:30 - Dana Okafor: Drafts look lovely! First feedback:
+Can you make the logo bigger in the header? Also, could you change the hero photo to the harbour one I sent?
+07/09/2026, 11:36 - Dana Okafor: And swap the order of the services so Branding comes first.
+10/09/2026, 14:00 - Dana Okafor: Could we also have a blog? I'd like you to set it up and write the first three posts.
+10/09/2026, 14:03 - Dana Okafor: How about a Spanish version of the whole site too? Half our visitors speak Spanish.
+12/09/2026, 09:50 - Dana Okafor: Second round of feedback, can we try a darker blue for the buttons?
+12/09/2026, 09:52 - Dana Okafor: Please move the contact form above the map.
+15/09/2026, 17:15 - Dana Okafor: Could you make the site feel more premium?
+15/09/2026, 17:20 - Dana Okafor: Can the gallery show 30 photos?
+15/09/2026, 17:24 - Dana Okafor: When will the launch be?
+18/09/2026, 10:10 - Dana Okafor: Sorry, round three! Can you change the heading font to something rounder?
+18/09/2026, 10:12 - Dana Okafor: Also please make the footer colour match the logo.
+20/09/2026, 12:00 - Dana Okafor: Please add a booking calendar so clients can book a studio visit.
+20/09/2026, 12:05 - Dana Okafor: Can you connect our newsletter signup to Mailchimp?
+22/09/2026, 08:30 - Dana Okafor: Could the contact form send enquiries to two email addresses?
+22/09/2026, 08:33 - Dana Okafor: Please send the final invoice to accounts@harborlight.example, or call me on +1 555 0142.
+22/09/2026, 08:40 - Alex Rivera: Will do. I'll send a scope note on the extras this week.

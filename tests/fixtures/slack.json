@@ -1,0 +1,5 @@
+[
+  {"user_name": "Sam Client", "text": "Can you add a pricing table?", "ts": "1773324300.000100"},
+  {"user_name": "Pat Freelancer", "text": "On it.", "ts": "1773324400.000200"},
+  {"user_name": "Sam Client", "text": "Please change the banner colour.", "ts": "1773410700.000300", "subtype": "message"}
+]

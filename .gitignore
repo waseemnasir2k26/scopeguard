@@ -1,0 +1,20 @@
+.env
+.env.*
+out/
+*.state.json
+.watch-state.json
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+# real client exports: never commit these
+private/
+exports/
+*.mbox
+!tests/fixtures/*.mbox
+real-*.txt
+rates.yaml
+!examples/rates.yaml

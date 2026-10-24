@@ -1,0 +1,19 @@
+> DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.
+
+**Subject:** Quick scope check: Change Heading Font
+
+Hi Dana,
+
+Thanks for this, and happy to help. You asked: "Can you change the heading font to something rounder?"
+
+We've now used the 2 revision round(s) included in the agreement, so I'd like to treat further changes as a small add-on. The closest part of the agreed scope is: C10 (SOW 2.1).
+
+**Estimate:** 2 h x $60.00/h = $120.00
+
+This is an estimate based on my rate card; I'll confirm the final figure before starting. If that works for you, just reply "approved" and I'll slot it in. Happy to talk it through if you'd like.
+
+Best,
+[Your name]
+
+---
+_Basis: default hours x hourly rate. Classified OUT-OF-SCOPE with confidence 1.00. Reason: Revision round 3 of this project; the SOW includes 2. Rounds are counted heuristically (messages less than 30 minutes apart are one round)._

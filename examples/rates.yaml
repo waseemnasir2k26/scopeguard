@@ -1,0 +1,15 @@
+# Example rate card (synthetic). Edit every number.
+hourly_rate: 60
+currency: USD
+minimum_hours: 0.5
+default_hours: 2
+tasks:
+  - match: [blog, article]
+    hours: 6
+    label: Blog setup and first posts
+  - match: [translate, translation, spanish, french]
+    fixed: 450
+    label: Translation of the site
+  - match: [logo, branding]
+    hours: 5
+    label: Logo work

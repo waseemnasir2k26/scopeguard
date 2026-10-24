@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scopeguard"
+version = "1.0.0"
+description = "Scope-creep detector for freelancers: classifies client requests against your SOW and drafts change orders. Local-first, never sends."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Waseem Nasir", email = "info@skynetjoe.com" }]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+pdf = ["pypdf>=4.0"]
+dev = ["pytest>=7", "pypdf>=4.0"]
+
+[project.scripts]
+scopeguard = "scopeguard.cli:main"
+
+[tool.setuptools]
+packages = ["scopeguard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
