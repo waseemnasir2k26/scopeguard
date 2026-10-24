@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Iterable, Optional
 
 from .models import Message, Request
-from .acts import classify_act
+from .acts import SOFT_RETRACT, classify_act
 from .textutil import concepts, normalize
 
 _IMPERATIVE = (r"^(?:(?:also|and|then|plus|so|ok|okay|sorry|actually)[,!.]?\s+)*(?:please\s+)?"
@@ -40,7 +40,7 @@ _REV_CUE = re.compile(
     r"move|bigger|smaller|larger|darker|lighter|brighter|font|colou?r|instead of|different (colou?r|font|image|photo|layout|"
     r"order)|order of|typo|typos|fix|correct|spelling|reword|shorten|lengthen|spacing|padding|margin|align(ed|ment)?|"
     r"position|reorder|rearrange|enlarge|shrink|text size|headline|heading|increase|decrease|reduce|raise|lower|"
-    r"widen|narrow|taller|shorter|wider|thicker|thinner|bolder)\b", re.I)
+    r"widen|narrow|taller|shorter|wider|thicker|thinner|bolder|rounder|sharper|softer|crisper|tweaks?)\b", re.I)
 _NEW_CUE = re.compile(
     r"\b(add|adding|new|build|create|set ?up|integrate|connect|write|translate|install|launch|start|include|"
     r"also (want|need)|plus)\b", re.I)
@@ -62,28 +62,36 @@ def split_sentences(text: str) -> list[str]:
     return out
 
 
+_NEG = re.compile(r"\b(no|not|never|without|cancel\w*|drop|skip|scratch|scrap|ignore|remove|disregard|hold off|pause|"
+                  r"instead|rather|forget|stop|won'?t|wont|don'?t|dont|nope|nix|ditch|delete)\b|n't\b", re.I)
+
+
+def is_plain_request(sentence: str, act: str = "request") -> bool:
+    """A sentence that simply asks for something: a request cue, no negation, no retraction wording."""
+    return act == "request" and bool(_CUES.search(sentence)) and not _NEG.search(sentence)
+
+
 def extract_requests(messages: Iterable[Message]) -> tuple[list[Request], list[dict]]:
-    """Candidate requests plus the sentences that were skipped on purpose (never silently):
-    pleasantries, status questions and billing admin."""
+    """Candidate requests, plus EVERY other client sentence with the reason it was not a request
+    (pleasantry, status question, billing admin, too short, no request wording). Nothing disappears."""
     out: list[Request] = []
-    skipped: list[dict] = []
-    for m in messages:
-        for sent in split_sentences(m.text):
+    others: list[dict] = []
+    for mi, m in enumerate(messages):
+        for si, sent in enumerate(split_sentences(m.text)):
             act = classify_act(sent)
             why = ("pleasantry" if (_SKIP.match(sent) and len(sent.split()) <= 6) else "status question" if _STATUS.search(sent)
                    else "billing admin" if _ADMIN.search(sent) else "")
-            if why:
-                if _CUES.search(sent) or act != "request":
-                    skipped.append({"quote": sent, "why": why, "message": m.id})
-                continue
-            if len(sent.split()) < 2:
-                continue
+            if not why and len(sent.split()) < 2:
+                why = "too short to be a request"
             # a retraction, hedge or hypothetical is kept (as UNCLEAR, never billed) even without a request cue
-            if act == "request" and not _CUES.search(sent):
+            if not why and act == "request" and not _CUES.search(sent) and not SOFT_RETRACT.search(sent):
+                why = "no request wording"
+            if why:
+                others.append({"quote": sent, "why": why, "message": m.id, "pos": (mi, si), "sender": m.sender, "ts": m.ts})
                 continue
-            out.append(Request(id="", message_id=m.id, sender=m.sender, ts=m.ts, quote=sent,
+            out.append(Request(id="", message_id=m.id, sender=m.sender, ts=m.ts, quote=sent, pos=(mi, si), last_pos=(mi, si),
                                is_revision=is_revision(sent) and act == "request", act=act))
-    return out, skipped
+    return out, others
 
 
 def heuristic_requests(messages: Iterable[Message]) -> list[Request]:
@@ -227,11 +235,12 @@ def _same_intent(a: Request, b: Request, order: dict) -> bool:
     ta, tb = _toks(a), _toks(b)
     if not ta or not tb:
         return False
-    jac = len(ta & tb) / len(ta | tb)
     if a.is_revision or b.is_revision:
+        jac = len(ta & tb) / len(ta | tb)
         return a.is_revision and b.is_revision and jac >= 0.6
-    strong = {t for t in ta & tb if t.startswith("c:")}
-    return jac >= 0.5 or bool(strong)
+    # different deliverables must not merge ("a second form" vs "the contact form"): demand 80% overlap of the
+    # shorter wording, on top of the same verdict and the same cited clause
+    return len(ta & tb) / min(len(ta), len(tb)) >= 0.8
 
 
 def consolidate_findings(findings: list, messages: list, sow) -> list:
@@ -249,7 +258,7 @@ def consolidate_findings(findings: list, messages: list, sow) -> list:
         target = None
         if f.request.act == "request":
             for k in reversed(kept[-WINDOW_MESSAGES:]):
-                if (k.request.act == "request" and k.cls == f.cls and kind(k) == kind(f)
+                if (k.request.act == "request" and k.cls == f.cls and k.clause_id == f.clause_id
                         and bool(k.request.withdrawn_by) == bool(f.request.withdrawn_by)
                         and _same_intent(k.request, f.request, order)):
                     target = k
@@ -260,6 +269,7 @@ def consolidate_findings(findings: list, messages: list, sow) -> list:
         else:
             target.request.extra_quotes.append(f.request.quote)
             target.request.message_ids.append(f.request.message_id)
+            target.request.last_pos = max(target.request.last_pos, f.request.last_pos)
             target.notes.append("Merged a split or duplicate request into this item.")
     for i, f in enumerate(kept, 1):
         f.id = f"REQ-{i:02d}"

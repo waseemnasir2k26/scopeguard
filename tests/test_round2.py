@@ -151,8 +151,8 @@ def test_client_matches_whole_name_tokens_only():
         run(msgs, client=("Dan",))
     res = run(msgs, client=("Dana",))
     assert [f.request.sender for f in res.findings] == ["Dana"]
-    res = run([("Dana Okafor", "Please add a blog."), ("Dana Smith", "Please add a shop.")], client=("Dana",))
-    assert len(res.findings) == 2 and any("matches several senders" in w for w in res.warnings)
+    with pytest.raises(ClientError, match="matches several senders"):        # two Danas: refuse, never guess
+        run([("Dana Okafor", "Please add a blog."), ("Dana Smith", "Please add a shop.")], client=("Dana",))
     res = run([("Dana Okafor", "Please add a blog."), ("Dana Smith", "Please add a shop.")], client=("Dana Okafor",))
     assert len(res.findings) == 1 and not res.warnings
 
@@ -291,7 +291,8 @@ def test_injection_text_cannot_turn_included_work_into_a_bill():
 def test_skipped_sentences_are_counted_and_listed():
     res = run(["Thanks, that looks great! When will the first draft be ready? Please send the invoice to accounts@harborlight.example.",
                "Hey, about that blog: can you add one?"])
-    assert res.meta["skipped_total"] >= 2 and any(s["why"] == "billing admin" for s in res.meta["skipped"])
+    why = {o["why"] for o in res.meta["other_client_messages"]}
+    assert res.meta["other_client_messages_total"] >= 3 and {"billing admin", "status question"} <= why
     assert any("blog" in f.request.quote for f in res.findings)                   # 'Hey, ...' is not a pleasantry
 
 

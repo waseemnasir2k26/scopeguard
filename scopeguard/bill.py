@@ -10,6 +10,7 @@ from typing import Callable
 
 from .changeorder import draft
 from .classify import short_title  # noqa: F401  (re-exported for callers)
+from .fsutil import atomic_write
 from .ledger import Ledger
 from .models import Finding, Request
 from .rates import RateCard
@@ -38,8 +39,25 @@ def from_dict(d: dict) -> Finding:
                 clause_kind=d.get("clause_kind") or "", reason=d.get("reason") or "", title=d.get("title") or "",
                 rule=d.get("rule"), estimate=d.get("estimate"), draft_file=d.get("draft_file") or "",
                 notes=list(d.get("notes") or []), round_log=list(d.get("round_log") or []),
-                status=d.get("status") or "", fingerprint=d.get("fingerprint") or "", free_by=d.get("free_by") or "")
+                status=d.get("status") or "", fingerprint=d.get("fingerprint") or "", free_by=d.get("free_by") or "",
+                later_mention=d.get("later_mention") or "", latest_related=d.get("latest_related") or "")
     return f
+
+
+def ledger_for(data: dict, out_dir: str | Path) -> Ledger:
+    """The ledger recorded in findings.json, but only if it lives inside the output folder: a doctored
+    findings.json must not point `bill` at some other file."""
+    out = Path(out_dir).resolve()
+    declared = (data.get("meta") or {}).get("ledger")
+    path = Path(declared).resolve() if declared else out / "ledger.json"
+    if out != path.parent and out not in path.parents:
+        raise BillError(f"findings.json names a ledger outside the output folder ({path}); refusing to use it.")
+    return Ledger(path)
+
+
+def _save(out: Path, data: dict, ledger: Ledger) -> None:
+    with ledger.lock():
+        atomic_write(out / "findings.json", json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def select(findings: list[Finding], ids: list[str]) -> list[Finding]:
@@ -75,27 +93,28 @@ def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "frien
     out = Path(out_dir)
     co = out / "change-orders"
     co.mkdir(parents=True, exist_ok=True)
-    ledger = Ledger(data.get("meta", {}).get("ledger") or out / "ledger.json")
+    ledger = ledger_for(data, out)
     written = []
     by_fp = {d["fingerprint"]: d for d in data["findings"]}
     for f in chosen:
         name = f"{f.fingerprint}-{slug(f.title)}.md"
         (co / name).write_text(draft(f, card, tone, data.get("revision_limit")), encoding="utf-8")
-        ledger.record(f.fingerprint, "billed", quote=f.request.quote[:200], draft=f"change-orders/{name}")
+        ledger.record(f.fingerprint, "billed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender,
+                      draft=f"change-orders/{name}")
         by_fp[f.fingerprint]["draft_file"] = f"change-orders/{name}"
         by_fp[f.fingerprint]["status"] = BILLED
         written.append(co / name)
-    (out / "findings.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    _save(out, data, ledger)
     return written
 
 
 def dismiss(out_dir: str | Path, ids: list[str]) -> list[Finding]:
     data, findings = load_findings(out_dir)
     chosen = select(findings, ids)
-    ledger = Ledger(data.get("meta", {}).get("ledger") or Path(out_dir) / "ledger.json")
+    ledger = ledger_for(data, out_dir)
     by_fp = {d["fingerprint"]: d for d in data["findings"]}
     for f in chosen:
-        ledger.record(f.fingerprint, "dismissed", quote=f.request.quote[:200])
+        ledger.record(f.fingerprint, "dismissed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender)
         by_fp[f.fingerprint]["status"] = DISMISSED
-    (Path(out_dir) / "findings.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    _save(Path(out_dir), data, ledger)
     return chosen

@@ -89,10 +89,12 @@ def _ask(req: Request, sow: Sow, llm, redact_fn, min_confidence: float) -> dict:
 
 
 def fingerprint(req: Request) -> str:
-    """A stable id for an item: who said it, when, and the wording. Survives re-runs on a growing export."""
+    """A stable id: who said it, the wording, and which occurrence of that wording it is. Deliberately NOT the
+    timestamp: day-first vs month-first exports, Android vs iOS, and seconds all change timestamps, and an id
+    that moves would bring a drafted or dismissed item back as a new one."""
     import hashlib
     from .textutil import normalize
-    raw = f"{req.sender}|{req.ts or ''}|{normalize(req.quote)}"
+    raw = f"{normalize(req.sender)}|{normalize(req.quote)}|{req.occ}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
 
 

@@ -4,10 +4,10 @@
     "llm": "ollama:skynetlabs-assistant",
     "cloud": false,
     "redacted": false,
-    "seconds": 9.6,
-    "messages": 18,
-    "client_messages": 17,
-    "requests": 16,
+    "seconds": 10.9,
+    "messages": 22,
+    "client_messages": 21,
+    "requests": 18,
     "merged_duplicates": 1,
     "dropped_by_evidence_rule": 0,
     "tone": "friendly",
@@ -15,23 +15,34 @@
     "revision_rounds_used": 0,
     "ledger": "examples\\adversarial-output\\ledger.json",
     "status_counts": {
-      "call": 6,
-      "withdrawn": 2,
+      "call": 7,
+      "withdrawn": 3,
       "extra": 5,
       "in": 2,
       "included_by_you": 1
     },
     "free_offers": 1,
-    "skipped": [],
-    "skipped_total": 0
+    "other_client_messages": [
+      {
+        "quote": "Thanks!",
+        "why": "pleasantry",
+        "date": "2026-10-05T09:12:00"
+      },
+      {
+        "quote": "The video thing can wait for now.",
+        "why": "no request wording",
+        "date": "2026-10-05T11:20:00"
+      }
+    ],
+    "other_client_messages_total": 2
   },
-  "headline": "Possible extra work to discuss: 5 items ($1,710.00 to $3,420.00 if all are confirmed; 28.5-57 h)",
+  "headline": "Possible extra work to discuss: 5 items ($1,395.00 to $2,790.00 if all are confirmed; 23.25-46.5 h)",
   "warnings": [],
   "revision_limit": 2,
   "findings": [
     {
       "id": "REQ-01",
-      "fingerprint": "bd38cd19",
+      "fingerprint": "a291744f",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -53,11 +64,13 @@
       "revision_round": 0,
       "act": "retracted",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-02",
-      "fingerprint": "1aee49f3",
+      "fingerprint": "3287dcea",
       "status": "withdrawn",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -79,11 +92,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": "Actually never mind, forget it.",
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-03",
-      "fingerprint": "ff3190c1",
+      "fingerprint": "df334f14",
       "status": "withdrawn",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -105,11 +120,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": "On reflection, forget the booking calendar.",
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-04",
-      "fingerprint": "63dc4915",
+      "fingerprint": "41bd5702",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -143,11 +160,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-05",
-      "fingerprint": "9646ab38",
+      "fingerprint": "aa456a27",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -169,11 +188,13 @@
       "revision_round": 0,
       "act": "conditional",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-06",
-      "fingerprint": "20bf1f8a",
+      "fingerprint": "f0f82653",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -195,11 +216,13 @@
       "revision_round": 0,
       "act": "sarcastic",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-07",
-      "fingerprint": "e15225f1",
+      "fingerprint": "d74ea837",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -221,11 +244,13 @@
       "revision_round": 0,
       "act": "hypothetical",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-08",
-      "fingerprint": "2ed983e2",
+      "fingerprint": "952c4f4e",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.9,
@@ -247,11 +272,13 @@
       "revision_round": 0,
       "act": "retracted",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-09",
-      "fingerprint": "9fee1a41",
+      "fingerprint": "4f2d186a",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.85,
@@ -277,11 +304,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-10",
-      "fingerprint": "ff2054cb",
+      "fingerprint": "37fb34de",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.85,
@@ -303,11 +332,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-11",
-      "fingerprint": "8176965a",
+      "fingerprint": "d6f49065",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.85,
@@ -327,12 +358,12 @@
         "rate": 60.0,
         "is_estimate": true,
         "placeholder_rate": false,
-        "hours": 15.0,
-        "hours_low": 11.25,
-        "hours_high": 22.5,
-        "amount": 900.0,
-        "amount_low": 675.0,
-        "amount_high": 1350.0,
+        "hours": 8.0,
+        "hours_low": 6.0,
+        "hours_high": 12.0,
+        "amount": 480.0,
+        "amount_low": 360.0,
+        "amount_high": 720.0,
         "basis": "LLM-proposed hours x hourly rate"
       },
       "draft_file": null,
@@ -341,11 +372,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-12",
-      "fingerprint": "71995e16",
+      "fingerprint": "710f666c",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.85,
@@ -379,11 +412,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-13",
-      "fingerprint": "8b47fecb",
+      "fingerprint": "20ca3d31",
       "status": "included_by_you",
       "class": "UNCLEAR",
       "confidence": 0.4,
@@ -407,11 +442,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": "Sure, the live chat is on the house."
+      "free_by": "Sure, the live chat is on the house.",
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-14",
-      "fingerprint": "e24a3d76",
+      "fingerprint": "c6d4160d",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.85,
@@ -445,11 +482,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-15",
-      "fingerprint": "29ecf571",
+      "fingerprint": "433b09f0",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.85,
@@ -471,11 +510,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-16",
-      "fingerprint": "f77649e6",
+      "fingerprint": "d2006d2a",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -509,7 +550,79 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
+    },
+    {
+      "id": "REQ-17",
+      "fingerprint": "52c6152e",
+      "status": "call",
+      "class": "OUT-OF-SCOPE",
+      "confidence": 0.9,
+      "quote": "Could we add a looping video background on the homepage?",
+      "also_quoted": [],
+      "sender": "Dana Okafor",
+      "date": "2026-10-05T11:00:00",
+      "clause_id": "C15",
+      "clause_text": "Logo or brand design, photography and video production are not included.",
+      "clause_ref": "3.4",
+      "clause_kind": "exclusion",
+      "rule": "explicit_exclusion",
+      "reason": "Later message mentions this: \"The video thing can wait for now.\". Check whether it was withdrawn. The SOW explicitly excludes this (C15 (SOW 3.4)).",
+      "title": "Looping Video Background",
+      "estimate": {
+        "currency": "USD",
+        "rate": 60.0,
+        "is_estimate": true,
+        "placeholder_rate": false,
+        "hours": 8.0,
+        "hours_low": 6.0,
+        "hours_high": 12.0,
+        "amount": 480.0,
+        "amount_low": 360.0,
+        "amount_high": 720.0,
+        "basis": "LLM-proposed hours x hourly rate"
+      },
+      "draft_file": null,
+      "notes": [
+        "moved from Possible extra to Needs your call by the later-message safety net"
+      ],
+      "round_log": [],
+      "revision_round": 0,
+      "act": "request",
+      "withdrawn_by": null,
+      "free_by": null,
+      "later_mention": "The video thing can wait for now.",
+      "latest_related": "\"The video thing can wait for now.\" (2026-10-05)"
+    },
+    {
+      "id": "REQ-18",
+      "fingerprint": "440af2af",
+      "status": "withdrawn",
+      "class": "UNCLEAR",
+      "confidence": 0.9,
+      "quote": "Please add an online shop with payments.",
+      "also_quoted": [],
+      "sender": "Dana Okafor",
+      "date": "2026-10-05T11:30:00",
+      "clause_id": null,
+      "clause_text": null,
+      "clause_ref": null,
+      "clause_kind": null,
+      "rule": "withdrawn",
+      "reason": "Withdrawn by the client later: \"Hold off on the shop, we are not going ahead.\". Never billed.",
+      "title": "Please add an online shop with payments",
+      "estimate": null,
+      "draft_file": null,
+      "notes": [],
+      "round_log": [],
+      "revision_round": 0,
+      "act": "request",
+      "withdrawn_by": "Hold off on the shop, we are not going ahead.",
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     }
   ],
   "tone": "friendly"

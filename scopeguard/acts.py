@@ -19,7 +19,17 @@ _RETRACT = re.compile(
     r"|\bignore (?:that|my|the (?:last|earlier|previous))\b|\bnot needed\b|\bwe don'?t need\b"
     r"|\bwon'?t (?:be )?(?:need|want)\w*\b|\bno longer (?:need|want)\b|\bnot after all\b|\bwithdraw\b"
     r"|\bleave (?:it|that) out\b|\boff the table\b|\blet'?s not\b|\bon second thought\b"
-    r"|\bwe(?:'re| are) good without\b|\btoo expensive\b|\bhmm,? no\b|\bnot doing\b", re.I)
+    r"|\bwe(?:'re| are) good without\b|\btoo expensive\b|\bhmm,? no\b|\bnot doing\b"
+    r"|\bwe (?:won'?t|will not|are not going to|aren'?t going to) (?:be )?(?:do|doing|need|want|add|go|going|have|having|"
+    r"build|building|proceed|proceeding|use|using)\b|\bno longer (?:required|needed|need|want|wanted|necessary|relevant)\b"
+    r"|\bnot (?:required|necessary)\b|\bhold off\b|\bdisregard (?:that|this|it|my)\b|\bditch (?:that|this|it)\b"
+    r"|\bcancel(?:le?d)? (?:that|this|it)\b|\bdrop (?:that|this)\b|\bskip (?:that|this|it)\b|\bignore (?:that|this|it)\b", re.I)
+# "Cancel the shop", "Pls remove shop", "No shop please": verb + object. Only a retraction if it names something
+# an EARLIER request was about, so "Please drop the files into the About page" stays a request.
+SOFT_RETRACT = re.compile(
+    r"^(?:(?:ok|okay|actually|sorry|hey|and|also|so|then|well|um)[,!.]?\s+)*(?:please\s+|pls\s+|plz\s+)?"
+    r"(?:cancel|cancle|drop|skip|scratch|scrap|ignore|remove|disregard|ditch|nix|delete|pause|stop|hold off(?: on)?|"
+    r"leave out|take out|forget|axe|bin)\b|^no\s+[\w -]{1,30}?\s+(?:please|pls|plz)\b", re.I)
 # "yes please do add it after all" cancels a retraction cue in the same sentence
 _AFFIRM = re.compile(r"\byes,? (?:please|do|let'?s)\b|\bplease do add\b|\bgo ahead\b|\blet'?s do it\b", re.I)
 _SARCASM = re.compile(r"\boh,? sure\b|\bwhy not\b|\byeah,? right\b|\bas if\b", re.I)
@@ -109,6 +119,14 @@ def apply_withdrawals(requests: list, near_messages: int = 3) -> list:
         order.setdefault(r.message_id, len(order))
     consumed = set()
     ctoks = [content_tokens(r.text()) for r in requests]
+    # verb + object retractions ("Cancel the shop", "Pls remove shop", "No shop please") count only when they
+    # name something an earlier request was about
+    seen_tokens: set = set()
+    for pos, r in enumerate(requests):
+        if r.act == "request" and SOFT_RETRACT.search(r.quote) and ctoks[pos] & seen_tokens:
+            r.act, r.is_revision = "retracted", False
+        elif r.act == "request":
+            seen_tokens |= ctoks[pos]
     index: dict = {}                       # content word -> positions of live requests (so no O(n^2) scan)
     for pos, r in enumerate(requests):
         if r.act == "request":

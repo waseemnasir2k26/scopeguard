@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1 - 2026-10-25
+
+- Withdrawals no longer depend on a closed vocabulary: a safety net moves any possible extra to "Needs your call" when a later client message about the same thing is not a plain request for it ("later message mentions this: ..."). Retraction wording widened (cancel, drop, skip, scratch, ignore, remove, hold off, pause, disregard, leave out, won't do, no longer required, no X please, pls/plz). `bill --all-strong` cannot include such items and its listing shows the latest related client message.
+- Every client sentence is accounted for: an item, a retraction linked to its item, or "Other client messages" in the report with the reason.
+- Stable ids: `sha1(client | wording | n-th identical ask)`, not the timestamp; the ledger re-binds by quote similarity (>= 0.95) with a warning.
+- Ledger: an unreadable ledger stops the run (never treated as empty); fsynced atomic writes keep a `.bak` on every write; `scopeguard ledger repair`. `findings.json` is written atomically under the same lock; `bill` refuses a ledger outside the output folder.
+- `watch` and `serve` accumulate each client's thread (`<data>/<client>/messages.jsonl`) and re-analyse it whole, with the ledger applied.
+- `--client` matching several senders, or the freelancer named in the SOW, is refused with the sender list.
+- Consolidation needs the same clause and 80% overlap; "store" alone is no longer e-commerce; more revision words (rounder, sharper, softer, crisper); long quotes are cut in drafts; `--redact` help matches what redaction does.
+
 ## 1.1.0 - 2026-10-25
 
 Structural change: scopeguard suggests, you decide.

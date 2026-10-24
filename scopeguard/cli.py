@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .ledger import LedgerCorrupt
 from .llm import LLMError, make_backend
 from .changeorder import headline
 from .ledger import Ledger
@@ -26,7 +27,8 @@ def _common(p: argparse.ArgumentParser) -> None:
                    "(repeatable). Required when the export has several senders")
     p.add_argument("--me", action="append", default=[], help="your own sender name to ignore (repeatable)")
     p.add_argument("--tone", choices=["friendly", "neutral", "firm"], default="friendly")
-    p.add_argument("--redact", action="store_true", help="mask emails and phone numbers before any LLM call")
+    p.add_argument("--redact", action="store_true", help="mask emails (also name [at] host [dot] com), card numbers, IBANs, "
+                   "phone numbers and names in From: lines and sign-offs before any LLM call")
     p.add_argument("--llm-extract", action="store_true", help="also ask the LLM to find requests (quotes must be verbatim)")
     p.add_argument("--min-confidence", type=float, default=0.5, help="below this, IN/OUT becomes UNCLEAR (default 0.5)")
     p.add_argument("--out", default="out", help="output folder (default ./out)")
@@ -78,6 +80,7 @@ def cmd_bill(args) -> int:
             e = f.estimate or {}
             print(f"  {f.fingerprint}  {f.request.quote[:70]!r}  ({f.clause_id}, {f.rule or 'model'}, "
                   f"{e.get('amount_low', '?')}-{e.get('amount_high', '?')} {e.get('currency', '')})")
+            print(f"      latest related client message: {f.latest_related or '(nothing later)'}")
         if args.yes:
             return True
         return input(f"Draft change orders for these {len(items)} items? [y/N] ").strip().lower() in ("y", "yes")
@@ -98,7 +101,7 @@ def cmd_dismiss(args) -> int:
 def cmd_watch(args) -> int:
     from .watch import watch
     opts, sow, sow_text = _build(args)
-    print(f"watching {args.folder} (Ctrl+C to stop)", file=sys.stderr)
+    print(f"watching {args.folder}; each client's thread accumulates under {args.out} (Ctrl+C to stop)", file=sys.stderr)
     try:
         watch(args.folder, sow, sow_text, opts, args.out, args.interval, args.once)
     except KeyboardInterrupt:
@@ -111,7 +114,7 @@ def cmd_serve(args) -> int:
     token = args.token or os.environ.get("SCOPEGUARD_TOKEN")
     opts, sow, sow_text = _build(args)
     try:
-        srv = make_server(args.host, args.port, sow, sow_text, opts, token, tuple(args.allowed_host))
+        srv = make_server(args.host, args.port, sow, sow_text, opts, token, tuple(args.allowed_host), args.data)
     except BindError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -140,6 +143,17 @@ def cmd_eval(args) -> int:
     if not res["revision_cases"]["all_correct"]:
         print("FAIL: not every revision case was classified correctly", file=sys.stderr)
         return 3
+    return 0
+
+
+def cmd_ledger(args) -> int:
+    from .ledger import Ledger
+    led = Ledger(Path(args.out) / "ledger.json")
+    if args.action == "repair":
+        print(led.repair())
+    else:
+        d = led.decisions()
+        print(f"{led.path}: {len(d)} decisions")
     return 0
 
 
@@ -182,6 +196,8 @@ def main(argv=None) -> int:
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--token", help="required for non-loopback hosts (or set SCOPEGUARD_TOKEN)")
     s.add_argument("--allowed-host", action="append", default=[], help="extra Host header value to accept (repeatable)")
+    s.add_argument("--data", default="scopeguard-data", help="folder where each client's thread, ledger and report accumulate "
+                   "(default ./scopeguard-data); every request re-analyses the whole thread")
     s.set_defaults(fn=cmd_serve)
 
     b = sub.add_parser("bill", help="draft change orders for the items you choose (analyze never does)")
@@ -192,6 +208,11 @@ def main(argv=None) -> int:
     b.add_argument("--all-strong", action="store_true", help="list the strong possible extras and ask y/N")
     b.add_argument("--yes", action="store_true", help="with --all-strong: skip the y/N prompt")
     b.set_defaults(fn=cmd_bill)
+
+    lg = sub.add_parser("ledger", help="check or repair the decisions ledger")
+    lg.add_argument("action", choices=["check", "repair"])
+    lg.add_argument("--out", default="out")
+    lg.set_defaults(fn=cmd_ledger)
 
     d = sub.add_parser("dismiss", help="record that an item is not an extra, so it does not come back")
     d.add_argument("items", nargs="+")
@@ -217,7 +238,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     try:
         return args.fn(args)
-    except (LLMError, ValueError, OSError, RuntimeError) as e:
+    except (LLMError, LedgerCorrupt, ValueError, OSError, RuntimeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

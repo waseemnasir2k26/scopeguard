@@ -10,11 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from .acts import apply_withdrawals, content_tokens, free_offer_sentences
+from .acts import apply_withdrawals, classify_act, content_tokens, free_offer_sentences
 from .changeorder import estimate
 from .classify import classify_all
-from .extract import (EvidenceIndex, consolidate_findings, extract_requests, llm_requests, merge_requests,
-                      split_sentences)
+from .extract import (_NEG, EvidenceIndex, consolidate_findings, extract_requests, is_plain_request, llm_requests,
+                      merge_requests, split_sentences)
 from .messages import load_messages
 from .models import OUT_OF_SCOPE, Finding, Message, Sow
 from .rates import RateCard
@@ -59,9 +59,18 @@ def _tokens(name: str) -> list[str]:
     return re.findall(r"[^\W_]+", normalize(name))
 
 
+_FREELANCER = re.compile(r"(?i:freelancer|contractor|consultant|developer|designer|agency|provider|supplier|"
+                         r"service provider)\s*[:\-]\s*([A-Z][\w'.-]+(?:\s+[A-Z][\w'.-]+){0,3})")
+
+
+def _freelancer_named_in_sow(sow_text: str) -> str:
+    m = _FREELANCER.search(sow_text or "")
+    return m.group(1) if m else ""
+
+
 def select_client_messages(messages: list[Message], sow_text: str, client: list[str], me: list[str]):
     """Who is the client? Never guessed. --client must match a sender by WHOLE name tokens ("Dana"
-    matches "Dana Okafor", "Dan" does not match "Dana"); several matching senders produce a warning."""
+    matches "Dana Okafor", "Dan" does not match "Dana"); several matching senders are refused."""
     warnings: list[str] = []
     senders = list(dict.fromkeys(m.sender for m in messages))
     if client:
@@ -72,8 +81,12 @@ def select_client_messages(messages: list[Message], sow_text: str, client: list[
             if not hits:
                 raise ClientError(f"--client {entry!r} matches no sender. Senders found: {senders}")
             if len(hits) > 1:
-                warnings.append(f"--client {entry!r} matches several senders {hits}; all are treated as the client. "
-                                "Use the full name to be exact.")
+                raise ClientError(f"--client {entry!r} matches several senders {hits}. Refusing to guess which one is the "
+                                  "client: pass the full name of exactly one of them.")
+            freelancer = _freelancer_named_in_sow(sow_text)
+            if freelancer and set(_tokens(freelancer)) & set(_tokens(hits[0])) and set(_tokens(entry)) <= set(_tokens(freelancer)):
+                raise ClientError(f"--client {entry!r} matches {hits[0]!r}, who is named as the freelancer in the SOW "
+                                  f"({freelancer!r}). Pass the client's name instead.")
             chosen_senders += [h for h in hits if h not in chosen_senders]
         return [m for m in messages if m.sender in chosen_senders], warnings
     if me:
@@ -86,6 +99,75 @@ def select_client_messages(messages: list[Message], sow_text: str, client: list[
         raise ClientError(f"This export has several senders {senders}, so scopeguard cannot tell who the client is."
                           f"{extra} Pass --client \"Full Name\" (or --me \"Your Name\").")
     return list(messages), warnings
+
+
+_CONTENT_MIN_SHARED = 2
+
+
+def _shares_subject(a: set, b: set) -> bool:
+    common = a & b
+    return any(t.startswith("c:") for t in common) or len(common) >= _CONTENT_MIN_SHARED
+
+
+def _safety_net(findings: list, all_requests: list, others: list) -> None:
+    """Vocabulary alone cannot catch every way of taking something back ("Hold off on the shop", "We're not doing
+    the shop"). So: any LATER client sentence about the same thing that is not a plain request for it moves a
+    possible extra to "Needs your call". Plain repeats are fine, but the latest related message is always shown."""
+    sents = []
+    for r in all_requests:
+        sents.append((r.pos, r.quote, is_plain_request(r.quote, r.act), r.ts, normalize(r.quote)))
+    for o in others:
+        sents.append((o["pos"], o["quote"], False, o["ts"], normalize(o["quote"])))
+    index: dict = {}
+    toks = []
+    for i, (pos, text, plain, ts, _n) in enumerate(sents):
+        t = content_tokens(text)
+        toks.append(t)
+        for w in t:
+            index.setdefault(w, []).append(i)
+    for f in findings:
+        if f.status != "extra":
+            continue
+        ftoks = content_tokens(f.request.text())
+        own = {normalize(q) for q in f.request.all_quotes()}
+        cand = set()
+        for w in ftoks:
+            cand.update(index.get(w, ()))
+        primary = normalize(f.request.quote)
+        about = sorted((sents[i] for i in cand if sents[i][0] > f.request.pos and sents[i][4] != primary
+                        and _shares_subject(ftoks, toks[i])), key=lambda x: x[0])
+        if about:                                   # the last thing the client said about it, repeats included
+            latest = about[-1]
+            f.latest_related = f'"{latest[1]}"' + (f" ({latest[3][:10]})" if latest[3] else "")
+        related = [x for x in about if x[0] > f.request.last_pos and x[4] not in own]
+        # a follow-up in the SAME message that merely explains the ask ("Half our visitors speak Spanish.") is context;
+        # only a negative or hedged one is a warning sign. In a LATER message anything non-plain about it counts.
+        related = [x for x in related if x[0][0] != f.request.last_pos[0] or _NEG.search(x[1]) or classify_act(x[1]) != "request"]
+        non_plain = [x for x in related if not x[2]]
+        if non_plain:
+            q = non_plain[-1][1]
+            f.later_mention = q
+            f.status = "call"
+            f.rule = f.rule or "later_mention"
+            f.reason = f'Later message mentions this: "{q[:140]}". Check whether it was withdrawn. ' + f.reason
+            f.notes.append("moved from Possible extra to Needs your call by the later-message safety net")
+
+
+def _rebind_ledger(findings: list, decisions: dict, warnings: list) -> None:
+    """If an item's id changed since you decided on it (different export format, say), re-bind the decision by
+    quote similarity of 0.95 or more, and say so."""
+    from difflib import SequenceMatcher
+    old = {k: v for k, v in decisions.items() if v.get("quote")}
+    for f in findings:
+        if f.fingerprint in decisions or not old:
+            continue
+        q = normalize(f.request.quote)
+        for k, v in old.items():
+            if SequenceMatcher(None, q, normalize(v["quote"])).ratio() >= 0.95:
+                decisions[f.fingerprint] = v
+                warnings.append(f"Your earlier decision ({v.get('decision')}) was re-bound to {f.fingerprint} by quote "
+                                f"similarity: the id of \"{f.request.quote[:60]}\" changed from {k}.")
+                break
 
 
 def _apply_free_offers(findings: list, all_messages: list, client_msgs: list) -> int:
@@ -135,7 +217,7 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
     warnings += w
 
     redact_fn = redact if opts.redact else (lambda s: s)
-    requests, skipped = extract_requests(client_msgs)
+    requests, others = extract_requests(client_msgs)
     dropped = 0
     if opts.llm_extract and opts.llm is not None:
         extra, dropped = llm_requests(opts.llm, client_msgs, redact_fn)
@@ -151,9 +233,14 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
             dropped += 1
         else:
             kept.append(r)
+    all_requests = list(kept)                      # before withdrawals: needed to see every later client sentence
     requests = apply_withdrawals(kept)             # a later "never mind" cancels the earlier item
+    seen_quotes: dict = {}
     for i, r in enumerate(requests, 1):
         r.id = f"Q{i}"
+        key = (normalize(r.sender), normalize(r.quote))
+        r.occ = seen_quotes.get(key, 0)            # 2nd identical quote by the same sender gets its own stable id
+        seen_quotes[key] = r.occ + 1
     assign_revision_rounds([r for r in requests if not r.withdrawn_by])
     log = rounds_log(requests)
 
@@ -163,7 +250,8 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
     findings = consolidate_findings(raw, client_msgs, sow)    # same verdict + same clause kind only
     n_before = len(raw)
     n_free = _apply_free_offers(findings, messages, client_msgs)
-    decisions = opts.ledger.decisions() if opts.ledger is not None else {}
+    decisions = dict(opts.ledger.decisions()) if opts.ledger is not None else {}
+    _rebind_ledger(findings, decisions, warnings)
     for f in findings:
         if f.rule == "revision_limit":
             f.round_log = log
@@ -173,6 +261,7 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
         else:
             f.estimate = None
         assign_status(f, decisions)
+    _safety_net(findings, all_requests, others)
     counts: dict = {}
     for f in findings:
         counts[f.status] = counts.get(f.status, 0) + 1
@@ -182,6 +271,8 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
             "requests": len(findings), "merged_duplicates": n_before - len(findings),
             "dropped_by_evidence_rule": dropped, "tone": opts.tone, "revision_limit": sow.revision_limit,
             "revision_rounds_used": max((r.revision_round for r in requests), default=0),
-            "ledger": str(opts.ledger.path) if opts.ledger is not None else "", "status_counts": counts, "free_offers": n_free, "skipped": skipped[:50], "skipped_total": len(skipped)}
+            "ledger": str(opts.ledger.path) if opts.ledger is not None else "", "status_counts": counts, "free_offers": n_free, "other_client_messages": [
+                {"quote": o["quote"], "why": o["why"], "date": o["ts"]} for o in others[:300]],
+            "other_client_messages_total": len(others)}
     return Result(sow=sow, messages=messages, client_messages=client_msgs, findings=findings,
                   warnings=warnings, meta=meta)

@@ -70,6 +70,11 @@ def one_line(text: str, limit: int = 120) -> str:
     return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "..."
 
 
+def _cut(text: str, limit: int = 500) -> str:
+    """Huge pasted quotes are cut (with an ellipsis) so a draft stays readable."""
+    return text if len(text) <= limit else text[:limit].rstrip() + "…"
+
+
 def _first_name(sender: str) -> str:
     s = re.sub(r"[^\w .'-]", "", sender.strip())
     return s.split()[0] if s and s.lower() not in {"client", "unknown"} else "there"
@@ -115,7 +120,7 @@ def draft(f: Finding, card: RateCard, tone: str = "friendly", revision_limit: in
                 f"{money(est['amount_low'], cur)}-{money(est['amount_high'], cur)})")
     else:
         calc = f"{money(est.get('amount', 0), cur)} (fixed price from rate card)"
-    quotes = " / ".join(f'"{md_escape(q)}"' for q in f.request.all_quotes())
+    quotes = " / ".join(f'"{md_escape(_cut(q))}"' for q in f.request.all_quotes())
     lines = [
         "> DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.",
         "",

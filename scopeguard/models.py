@@ -71,6 +71,9 @@ class Request:
     withdrawn_by: str = ""        # a later retraction that references this request
     conflict: str = ""            # a retraction in the same message contradicts this request
     hedged: str = ""              # a hedge right after it ("no pressure at all", "if the budget allows")
+    pos: tuple = (0, 0)           # (message index, sentence index) in the export
+    last_pos: tuple = (0, 0)      # position of the last quote merged into this item
+    occ: int = 0                  # n-th occurrence of an identical quote by the same sender (for a stable id)
 
     def all_quotes(self) -> list:
         return [self.quote] + list(self.extra_quotes)
@@ -100,3 +103,5 @@ class Finding:
     status: str = ""          # extra | call | in | withdrawn | included_by_you | dismissed | billed
     fingerprint: str = ""     # stable id across re-runs (sender + time + wording)
     free_by: str = ""         # a freelancer message offering this for free
+    later_mention: str = ""   # a later client sentence that mentions this and is not a plain request for it
+    latest_related: str = ""  # the latest later client sentence about it (shown before you bill)

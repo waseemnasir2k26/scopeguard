@@ -205,8 +205,8 @@ def test_split_request_is_consolidated_into_one_item():
 
 
 def test_duplicate_across_messages_within_window_but_not_beyond():
-    msgs = [Message(id="M1", sender="Dana", text="Can we add an online shop for prints?", ts="2026-03-01T10:00:00"),
-            Message(id="M2", sender="Dana", text="Any news on the online shop idea? Please add the shop soon.", ts="2026-03-03T10:00:00"),
+    msgs = [Message(id="M1", sender="Dana", text="Can we add an online shop?", ts="2026-03-01T10:00:00"),
+            Message(id="M2", sender="Dana", text="Please add the online shop.", ts="2026-03-03T10:00:00"),
             Message(id="M3", sender="Dana", text="Please add the online shop now.", ts="2026-04-20T10:00:00")]
     _, items = _classified(msgs)
     assert len(items) == 2 and len(items[0].request.extra_quotes) >= 1       # M3 is 7+ days later: separate item

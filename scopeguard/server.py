@@ -10,7 +10,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .changeorder import headline
 from .messages import parse_text_blob
 from .outputs import to_dict
+from .ledger import LedgerCorrupt
 from .pipeline import ClientError, Options, analyze
+from .store import StoreCorrupt
+from .thread import analyze_thread
 
 MAX_BODY = 1_000_000
 
@@ -36,7 +39,7 @@ def check_bind(host: str, token: str | None) -> None:
 
 
 def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: str | None = None,
-                allowed_hosts: tuple = ()) -> ThreadingHTTPServer:
+                allowed_hosts: tuple = (), data_dir: str | None = None) -> ThreadingHTTPServer:
     check_bind(host, token)
     allowed = {"localhost", "127.0.0.1", "[::1]", "::1", host.lower()} | {h.lower() for h in allowed_hosts}
     lock = threading.Lock()   # one analysis at a time: protects a single local GPU
@@ -111,9 +114,14 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
                         redact=opts.redact, llm_extract=opts.llm_extract, min_confidence=opts.min_confidence)
             try:
                 with lock:
-                    res = analyze(sow, messages=msgs, opts=o, sow_text=sow_text)
+                    if data_dir:        # accumulate: the whole thread is analysed, with the ledger applied
+                        res, folder = analyze_thread(data_dir, o.client, msgs, sow, sow_text, o)
+                    else:               # stateless (library use): only this request's messages are seen
+                        res, folder = analyze(sow, messages=msgs, opts=o, sow_text=sow_text), None
             except ClientError as e:
                 return self._send(400, {"error": str(e)})
+            except (StoreCorrupt, LedgerCorrupt) as e:
+                return self._send(409, {"error": str(e)})
             except Exception as e:  # report, never crash the server
                 return self._send(500, {"error": f"analysis failed: {type(e).__name__}"})
             out = to_dict(res)
@@ -121,6 +129,8 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
             out["possible_extras"] = extras
             out["possible_extras_count"] = len(extras)
             out["headline"] = headline(res.findings, opts.rates.currency)
+            out["thread"] = ({"folder": str(folder), "messages": res.meta.get("thread_messages"),
+                              "new_messages": res.meta.get("new_messages")} if folder else None)
             out["note"] = ("scopeguard suggests; you decide. No drafts are written by the server: "
                            "run `scopeguard bill <id>` locally for the items you agree with.")
             self._send(200, out)

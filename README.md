@@ -33,9 +33,9 @@ SCOPEGUARD_OLLAMA_MODEL=qwen3:8b scopeguard analyze --sow examples/sow.md \
 Open `out/report.html`. Then, for the items you agree with:
 
 ```bash
-scopeguard bill a8df8e8c --out out            # drafts one change order (id from the report)
+scopeguard bill 4c5c0174 --out out            # drafts one change order (id from the report)
 scopeguard bill --all-strong --out out        # lists the strong candidates, asks y/N
-scopeguard dismiss 44f51673 --out out        # "not an extra": hidden on every later run
+scopeguard dismiss 5a833369 --out out        # "not an extra": hidden on every later run
 ```
 
 `--client` is required whenever the export has more than one sender. scopeguard does not guess who the client is: the name is matched on whole name tokens (`Dana` matches `Dana Okafor`, `Dan` matches nothing). Create your own rate card with `scopeguard init`.
@@ -51,7 +51,7 @@ scopeguard dismiss 44f51673 --out out        # "not an extra": hidden on every l
 
 ## Real output
 
-Bundled synthetic example: `examples/sow.md` (a 5-page website, two revision rounds included) and `examples/whatsapp-chat.txt` (a made-up client). Model: **`skynetlabs-assistant` via local Ollama, a 2.5 GB model; 17.2 s on one consumer GPU.** 19 items: **10 possible extras, 1 needs your call, 8 in scope.** The generated headline:
+Bundled synthetic example: `examples/sow.md` (a 5-page website, two revision rounds included) and `examples/whatsapp-chat.txt` (a made-up client). Model: **`skynetlabs-assistant` via local Ollama, a 2.5 GB model; 18.3 s on one consumer GPU.** 19 items: **10 possible extras, 1 needs your call, 8 in scope.** The generated headline:
 
 > **Possible extra work to discuss: 10 items ($3,240.00 to $6,030.00 if all are confirmed; 46.5-93 h, plus 1 fixed-price)**
 
@@ -63,7 +63,7 @@ What this small model still gets wrong: its hour guesses. The range is wide beca
 
 ## What it refuses to bill
 
-A tool that invoices people for things they took back would be worse than no tool. Two critic rounds found these failure modes; each is now a rule, a test and a label. Real output on [`examples/adversarial-chat.txt`](examples/adversarial-chat.txt) (model `skynetlabs-assistant`; files in [`examples/adversarial-output/`](examples/adversarial-output/)). The headline there is "5 items", and none of the other eleven rows is priced:
+A tool that invoices people for things they took back would be worse than no tool. Two critic rounds found these failure modes; each is now a rule, a test and a label. Real output on [`examples/adversarial-chat.txt`](examples/adversarial-chat.txt) (model `skynetlabs-assistant`; files in [`examples/adversarial-output/`](examples/adversarial-output/)). The headline there is "5 items" ($1,395.00 to $2,790.00), and none of the other thirteen items is priced:
 
 | Client says                                                                                                   | scopeguard puts it         | Because                                                                                          |
 | ------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -81,6 +81,8 @@ A tool that invoices people for things they took back would be worse than no too
 | "Would it be possible to add a members area? No pressure at all."                                             | Needs your call            | hedged                                                                                           |
 | "Please add a Pricing page for the studio."                                                                   | Possible extra             | `page_count`: five pages are listed                                                              |
 | "Don't forget to add the newsletter signup we discussed."                                                     | Possible extra             | a plain request                                                                                  |
+| "Please add an online shop with payments." ... later: "Hold off on the shop, we are not going ahead." | Set aside: withdrawn | a retraction by wording ("hold off", "cancel", "drop", "skip", "won't do", "no longer required", "no X please", "pls remove X" ...) |
+| "Could we add a looping video background on the homepage?" ... later: "The video thing can wait for now." | Needs your call | the safety net: no list of words needed. A later message about the same thing that is not a plain request moves it out of Possible extras and says why |
 
 The rules behind it:
 
@@ -92,7 +94,8 @@ The rules behind it:
 - **A page the SOW names is never "extra"**, and neither is anything a deliverable already mentions (a gallery, a contact form).
 - **The model cannot create a bill.** An LLM OUT verdict is valid only if it cites an _exclusion_ the request actually mentions; citing a deliverable contradicts the SOW and becomes UNCLEAR. An IN verdict must be supported by its clause too. Prompt-injection text in a client message therefore cannot turn included work into a possible extra.
 - **Merging is conservative.** Two items merge only when the verdict and the kind of clause cited match.
-- **Nothing is dropped silently.** Pleasantries, status questions and billing-admin sentences that were skipped are counted in the summary and listed in `findings.json`.
+- **A safety net, because no list of words is complete.** Withdrawals are recognised by wording (cancel, drop, skip, scratch, ignore, remove, hold off, pause, disregard, leave out, "won't do", "no longer required", "no X please", with pls/plz shorthand), but a verb plus an object counts only when it names something an earlier request was about. Beyond that, **any later client message about the same thing that is not a plain request for it** moves a possible extra to "Needs your call" with the reason "later message mentions this: ...". A plain repeat ("please add the online shop soon") does not, and a follow-up sentence in the same message that just explains the ask ("half our visitors speak Spanish") does not. `bill --all-strong` can never include such an item, and its listing shows the latest related client message for every item.
+- **Nothing is dropped silently.** Every client sentence ends up in one of three places: an item, the retraction linked to the item it withdrew, or the "Other client messages" section at the bottom of the report (and in `findings.json`) with the reason it was not an item (pleasantry, status question, billing admin, too short, no request wording).
 
 ## Measured accuracy
 
@@ -107,7 +110,7 @@ The rules behind it:
 | Rules + offline mock (`--llm mock`)    | 97.4%          | 90.0%       | 14/14 and 3/3  |
 | Rules + `skynetlabs-assistant` (local) | 100.0%         | 95.0%       | 14/14 and 3/3  |
 
-Per class on the held-out set with the local model: IN-SCOPE 100% recall / 100% precision, OUT-OF-SCOPE 90% / 100%, UNCLEAR 100% / 80%. Rules-only on the 78 items: IN 97% / 100%, OUT 96% / 100%, UNCLEAR 100% / 92%; its precision on IN and OUT is 100%, so it never invents a possible extra on this set. `scopeguard eval` exits non-zero if any revision case is wrong. The 100% on the labelled set with the model is not evidence the model is good: the rules decide almost all of it. Reproduce:
+An independent reviewer also ran a blind set of phrasings against the previous version: it scored 80%, and every miss landed in "Needs your call", none in a possible extra. That is the failure direction the design aims for. Per class on the held-out set with the local model: IN-SCOPE 100% recall / 100% precision, OUT-OF-SCOPE 90% / 100%, UNCLEAR 100% / 80%. Rules-only on the 78 items: IN 97% / 100%, OUT 96% / 100%, UNCLEAR 100% / 92%; its precision on IN and OUT is 100%, so it never invents a possible extra on this set. `scopeguard eval` exits non-zero if any revision case is wrong. The 100% on the labelled set with the model is not evidence the model is good: the rules decide almost all of it. Reproduce:
 
 ```bash
 scopeguard eval --sow examples/sow.md --labels examples/eval/labels.json --llm none
@@ -132,7 +135,7 @@ Deterministic rules first, the model second, you last.
 
 Backends: local Ollama (`SCOPEGUARD_OLLAMA_MODEL`, else the first model Ollama lists), then opt-in cloud (`--llm groq` with `GROQ_API_KEY`, `--llm gemini` with `GEMINI_API_KEY`; `--llm auto --allow-cloud` falls back to them), `--llm mock` and `--llm none`. The cloud backends follow the documented APIs but are not covered by the automated tests (they need keys).
 
-**Scale.** Measured here with the offline mock (so model time is excluded): a 50,000-line WhatsApp export parses in 0.6 s and analyses in 1.7 s; 200,000 in-memory messages in about 6 s. Input is capped at 200,000 messages per run, with a message telling you to split the export.
+**Scale.** Measured here with the offline mock (so model time is excluded): a 50,000-line WhatsApp export parses in 0.6 s and analyses in about 3 s (the whole-thread safety net included); 200,000 in-memory messages in under 10 s. Input is capped at 200,000 messages per run, with a message telling you to split the export.
 
 ### rates.yaml
 
@@ -151,9 +154,11 @@ tasks: # optional; first keyword match wins
 ## Watch a folder, or call it from n8n
 
 ```bash
-scopeguard watch ./inbox --sow sow.md --rates rates.yaml --client "Dana Okafor" --out out
-scopeguard serve --sow sow.md --rates rates.yaml --client "Dana Okafor"   # http://127.0.0.1:8765
+scopeguard watch ./inbox --sow sow.md --rates rates.yaml --client "Dana Okafor" --out data
+scopeguard serve --sow sow.md --rates rates.yaml --client "Dana Okafor" --data data   # http://127.0.0.1:8765
 ```
+
+Both **accumulate each client's thread**: every message they see is appended to `data/<client>/messages.jsonl` (a re-sent email is not added twice) and the **whole thread** is re-analysed, with that client's ledger applied. So a retraction two emails later, a free offer in a reply, the revision rounds so far and your earlier `bill`/`dismiss` decisions all count, and the report in `data/<client>/` is always current (`scopeguard bill <id> --out data/<client>`). A thread with an unreadable line, or an unreadable ledger, stops with an error instead of carrying on.
 
 `serve` binds to `127.0.0.1`. Any other address is refused unless you pass `--token` (or `SCOPEGUARD_TOKEN`); the token also guards `/healthz`, the `Host` header is checked, and idle connections time out. [`examples/n8n-workflow.json`](examples/n8n-workflow.json) is a Gmail-label trigger that posts to the server and sends an **internal** Slack alert listing possible extras; it writes no drafts. Setup in [docs/n8n.md](docs/n8n.md).
 
@@ -167,7 +172,10 @@ Everything runs locally by default: files are read from disk, the local model ru
 - Not legal advice. A change-order draft is a polite message, not a contract term. Check your actual agreement.
 - The rule layer is lexical and deliberately narrow. It can miss a paraphrased exclusion and, rarely, over-match one. Revision-round counting uses a 30-minute heuristic and cannot know which deliverable a round belongs to; revision wording ("change", "move", "bigger") is a keyword list. Doubt is "Needs your call", so the cost of a miss is a request you read yourself, not a bill.
 - A request the SOW is silent on is "Needs your call" unless a rule or an exclusion the request mentions applies.
-- Withdrawal detection is by shared words and proximity. A retraction that names nothing ("never mind") refers to the request right before it; one that names a thing refers to earlier requests with the same words. It will miss a retraction phrased with none of the item's words, and it can withdraw the wrong item if two items share words. The report shows what withdrew what.
+- Withdrawal is wording plus a safety net. A retraction that names nothing ("never mind") refers to the request right before it; one that names a thing refers to earlier requests with the same words. A retraction phrased with none of the item's words is caught only by the safety net, which sends the item to "Needs your call" (it cannot know it was a retraction). It can also withdraw the wrong item if two items share words, and it can flag a harmless later message that happens to share words. All of those fail toward "Needs your call", never toward a bill; the report shows what moved an item and why.
+- Item ids are `sha1(client name | wording | n-th identical ask)`, deliberately not the timestamp, so a day-first vs month-first export, Android vs iOS, or seconds in the time do not change them. If an id still changes, your earlier decision is re-bound by quote similarity of 0.95 or more, with a warning.
+- The ledger keeps `ledger.json.bak` on every write. An unreadable ledger stops scopeguard (it never counts as empty, which would wipe your history); `scopeguard ledger repair --out DIR` restores the backup and keeps the damaged file.
+- `--client` must match exactly one sender by whole name tokens. Two matching senders ("Dana Okafor", "Dana Smith"), or a name the SOW gives to the freelancer, are refused with the sender list.
 - The extractor can miss requests with no cue words, and consolidation can merge two separate asks that share a topic. A freelancer's free offer is matched by shared words or by "that one" right after the item.
 - Sender lines are taken at face value. In a WhatsApp or chat export a message that contains a line shaped like `Name: text` can pass as a different sender; scopeguard does not verify who wrote what. Check the quoted messages in the original export before you rely on a finding.
 - Chat context across messages ("yes, do that") is not resolved. Attachments and images are ignored. PDF text extraction needs a text layer; scanned SOWs need OCR first.
@@ -190,7 +198,7 @@ pip install ".[dev]"
 python -m pytest
 ```
 
-172 tests: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter and SOW exceptions, revision counter, phrase-level exclusions, page counter, numeric caps and the quantity parser, retractions and withdrawals, conditionals and sarcasm, free offers, client matching, client-supplied assets, LLM-trust checks, consolidation, evidence rule and scale (50,000 messages), `analyze` writing no drafts, `bill` / `dismiss` / ledger (concurrent writers, stale lock), the two critics' probe files, change-order maths, HTML and CSV escaping, never-send, redaction, server auth, Host header and timeout, and the eval sets.
+231 tests: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter and SOW exceptions, revision counter, phrase-level exclusions, page counter, numeric caps and the quantity parser, retractions and withdrawals, conditionals and sarcasm, free offers, client matching, client-supplied assets, LLM-trust checks, consolidation, evidence rule and scale (50,000 messages), `analyze` writing no drafts, `bill` / `dismiss` / ledger (concurrent writers, stale lock), the safety net (33 phrasings of "take it back"), id stability across export formats, ledger corruption and repair, thread accumulation in `watch` and `serve`, and the critics' probe files, change-order maths, HTML and CSV escaping, never-send, redaction, server auth, Host header and timeout, and the eval sets.
 
 ## Need this wired into your business?
 

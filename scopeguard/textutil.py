@@ -36,7 +36,7 @@ setup functionality feature features system systems integration creation develop
 
 # word -> concept. A shared concept is a strong signal (weight 2); other shared words weigh 1.
 _CONCEPT_GROUPS = {
-    "shop": "shop store stores cart checkout ecommerce woocommerce sell selling sales purchase purchases payment payments",
+    "shop": "shop cart checkout ecommerce woocommerce sell selling sales purchase purchases payment payments",
     "blog": "blog blogs article articles news",
     "copywriting": "copywriting copywrite copy write writing written wording proofread proofreading",
     "translation": "translation translations translate translated multilingual bilingual language languages "

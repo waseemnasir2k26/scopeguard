@@ -316,4 +316,17 @@ def test_watch_scan_once_processes_each_file_once(examples, tmp_path):
     assert scan_once(inbox, parse_sow(text), text, opts, tmp_path / "out", seen, logs.append) == 1
     assert scan_once(inbox, parse_sow(text), text, opts, tmp_path / "out", seen, logs.append) == 0
     assert any("possible extras" in line for line in logs)
-    assert list((tmp_path / "out").glob("chat-*/report.html"))
+    folder = tmp_path / "out" / "dana"
+    first = json.loads((folder / "findings.json").read_text(encoding="utf-8"))
+    shop = next(f for f in first["findings"] if "online shop" in f["quote"])
+    assert shop["status"] == "extra" and (folder / "report.html").exists()
+    # a LATER file withdraws the shop: the watcher re-analyses the whole accumulated thread, so it is withdrawn now
+    g = inbox / "later.txt"
+    g.write_text("30/09/2026, 10:00 - Dana Okafor: Never mind about the online shop, scratch that.\n"
+                 "30/09/2026, 10:01 - Alex Rivera: ok\n", encoding="utf-8")
+    os.utime(g, (old, old))
+    assert scan_once(inbox, parse_sow(text), text, opts, tmp_path / "out", seen, logs.append) == 1
+    second = json.loads((folder / "findings.json").read_text(encoding="utf-8"))
+    assert next(f for f in second["findings"] if f["fingerprint"] == shop["fingerprint"])["status"] == "withdrawn"
+    assert second["meta"]["thread_messages"] > first["meta"]["messages"]
+    assert (folder / "messages.jsonl").exists()

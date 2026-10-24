@@ -1,15 +1,14 @@
-"""`scopeguard watch <folder>`: analyse each new or changed message export once."""
+"""`scopeguard watch <folder>`: add each new or changed export to the client's thread, then re-analyse the whole thread."""
 from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
 from .messages import load_messages
-from .outputs import write_all
-from .pipeline import Options, analyze
+from .pipeline import Options
+from .thread import analyze_thread
 
 EXTS = {".txt", ".eml", ".mbox", ".json"}
 
@@ -32,11 +31,10 @@ def scan_once(folder: Path, sow, sow_text: str, opts: Options, out_root: Path, s
             continue
         try:
             msgs = load_messages([p])
-            res = analyze(sow, messages=msgs, opts=opts, sow_text=sow_text)
-            dest = out_root / f"{p.stem}-{datetime.now():%Y%m%d-%H%M%S}"
-            write_all(res, dest, opts.rates, opts.tone)
+            res, dest = analyze_thread(out_root, opts.client, msgs, sow, sow_text, opts)
             outs = sum(1 for f in res.findings if f.status == "extra")
-            log(f"[watch] {p.name}: {len(res.findings)} items, {outs} possible extras -> {dest}")
+            log(f"[watch] {p.name}: {res.meta['new_messages']} new messages, thread of {res.meta['thread_messages']}, "
+                f"{outs} possible extras -> {dest}")
         except Exception as e:  # one bad file must not stop the watcher
             log(f"[watch] {p.name}: skipped ({type(e).__name__}: {e})")
         seen[p.name] = k
@@ -48,8 +46,6 @@ def watch(folder: str | Path, sow, sow_text: str, opts: Options, out_root: str |
           once: bool = False, log: Callable[[str], None] = print) -> None:
     folder, out_root = Path(folder), Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
-    from .ledger import Ledger
-    opts.ledger = Ledger(out_root / "ledger.json")
     state = out_root / ".watch-state.json"
     try:
         seen = json.loads(state.read_text(encoding="utf-8"))

@@ -46,6 +46,6 @@ Response: `findings[]` (status, class, confidence, quote, clause, rule, reason, 
 
 ## Notes
 
-- Items withdrawn later in the same export ("never mind the shop"), conditional or hypothetical requests, and work you offered for free are never listed as possible extras. The server sees only the messages in each request, so a withdrawal that arrives in a later email will not cancel an earlier alert; re-run `scopeguard analyze` on the whole thread for that.
+- Items withdrawn later in the same export ("never mind the shop"), conditional or hypothetical requests, and work you offered for free are never listed as possible extras. The server accumulates each client's thread under `--data` (default `./scopeguard-data/<client>/`) and re-analyses the whole thread on every request, with that client's ledger applied, so a withdrawal in a later email is seen. Use `scopeguard bill <id> --out scopeguard-data/<client>` to draft.
 - If n8n runs on a different machine (for example a VPS), do not expose scopeguard to the internet. Use an SSH tunnel or a private network, plus the token. Your local LLM and SOW stay on your machine.
 - The workflow reads email text and the local model reads it too. If you use a cloud model, add `--redact` and read the privacy section of the README first.

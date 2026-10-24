@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 
 from .changeorder import headline, money
+from .fsutil import atomic_write
+from .ledger import Ledger
 from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .pipeline import Result
 from .rates import RateCard
@@ -71,8 +73,8 @@ def write_summary(res: Result, card: RateCard, path: Path) -> None:
         L.append(f"- Revision rounds used: {m['revision_rounds_used']} of {m['revision_limit']} included")
     if m["dropped_by_evidence_rule"]:
         L.append(f"- Dropped by the evidence rule (quote not found verbatim): {m['dropped_by_evidence_rule']}")
-    if m.get("skipped_total"):
-        L.append(f"- Skipped on purpose (pleasantries, status questions, billing admin): {m['skipped_total']}")
+    if m.get("other_client_messages_total"):
+        L.append(f"- Other client messages (not turned into items, listed in the report with the reason): {m['other_client_messages_total']}")
     for w in res.warnings:
         L.append(f"- Warning: {w}")
     L += ["", "> scopeguard suggests; you decide. Nothing was drafted and nothing was sent. To draft a change order for an",
@@ -98,12 +100,13 @@ def write_summary(res: Result, card: RateCard, path: Path) -> None:
 def write_all(res: Result, out_dir: str | Path, card: RateCard, tone: str = "friendly") -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    write_csv(res, out / "scope-log.csv")
-    write_summary(res, card, out / "summary.md")
-    (out / "report.html").write_text(render_html(res, card), encoding="utf-8")
     d = to_dict(res)
     d["tone"] = tone
-    (out / "findings.json").write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+    with Ledger(out / "ledger.json").lock():       # one writer at a time; each file replaced atomically
+        write_csv(res, out / "scope-log.csv")
+        write_summary(res, card, out / "summary.md")
+        atomic_write(out / "report.html", render_html(res, card))
+        atomic_write(out / "findings.json", json.dumps(d, indent=2, ensure_ascii=False))
     return out
 
 
@@ -122,5 +125,6 @@ def to_dict(res: Result) -> dict:
             "draft_file": f.draft_file or None, "notes": f.notes, "round_log": f.round_log,
             "revision_round": f.request.revision_round, "act": f.request.act,
             "withdrawn_by": f.request.withdrawn_by or None, "free_by": f.free_by or None,
+            "later_mention": f.later_mention or None, "latest_related": f.latest_related or None,
         } for f in res.findings],
     }

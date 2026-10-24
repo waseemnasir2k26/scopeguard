@@ -4,7 +4,7 @@
     "llm": "ollama:skynetlabs-assistant",
     "cloud": false,
     "redacted": false,
-    "seconds": 17.2,
+    "seconds": 18.3,
     "messages": 24,
     "client_messages": 21,
     "requests": 19,
@@ -20,19 +20,59 @@
       "call": 1
     },
     "free_offers": 0,
-    "skipped": [
+    "other_client_messages": [
+      {
+        "quote": "Morning Alex!",
+        "why": "no request wording",
+        "date": "2026-09-02T09:12:00"
+      },
+      {
+        "quote": "The kickoff call was great, thanks.",
+        "why": "no request wording",
+        "date": "2026-09-02T09:12:00"
+      },
+      {
+        "quote": "We have four people.",
+        "why": "no request wording",
+        "date": "2026-09-02T09:20:00"
+      },
+      {
+        "quote": "I'm not great with words.",
+        "why": "no request wording",
+        "date": "2026-09-04T10:05:00"
+      },
+      {
+        "quote": "Drafts look lovely!",
+        "why": "no request wording",
+        "date": "2026-09-07T11:30:00"
+      },
+      {
+        "quote": "First feedback:",
+        "why": "no request wording",
+        "date": "2026-09-07T11:30:00"
+      },
+      {
+        "quote": "Half our visitors speak Spanish.",
+        "why": "no request wording",
+        "date": "2026-09-10T14:03:00"
+      },
       {
         "quote": "When will the launch be?",
         "why": "status question",
-        "message": "M17"
+        "date": "2026-09-15T17:24:00"
+      },
+      {
+        "quote": "Sorry, round three!",
+        "why": "no request wording",
+        "date": "2026-09-18T10:10:00"
       },
       {
         "quote": "Please send the final invoice to accounts@harborlight.example, or call me on +1 555 0142.",
         "why": "billing admin",
-        "message": "M23"
+        "date": "2026-09-22T08:33:00"
       }
     ],
-    "skipped_total": 2
+    "other_client_messages_total": 10
   },
   "headline": "Possible extra work to discuss: 10 items ($3,240.00 to $6,030.00 if all are confirmed; 46.5-93 h, plus 1 fixed-price)",
   "warnings": [],
@@ -40,7 +80,7 @@
   "findings": [
     {
       "id": "REQ-01",
-      "fingerprint": "f2cef4f7",
+      "fingerprint": "657daecb",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.85,
@@ -62,11 +102,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-02",
-      "fingerprint": "0c5f19e5",
+      "fingerprint": "87598cec",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 1.0,
@@ -88,11 +130,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-03",
-      "fingerprint": "a8df8e8c",
+      "fingerprint": "4c5c0174",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -106,7 +150,7 @@
       "clause_kind": "exclusion",
       "rule": "explicit_exclusion",
       "reason": "The SOW explicitly excludes this (C12 (SOW 3.1)).",
-      "title": "Add Online Shop",
+      "title": "Add online shop to website",
       "estimate": {
         "currency": "USD",
         "rate": 60.0,
@@ -126,11 +170,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-04",
-      "fingerprint": "ebd000b5",
+      "fingerprint": "c1860de0",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -164,11 +210,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": "\"I'd like you to set it up and write the first three posts.\" (2026-09-10)"
     },
     {
       "id": "REQ-05",
-      "fingerprint": "588ef95c",
+      "fingerprint": "0bde95e3",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.7,
@@ -190,11 +238,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-06",
-      "fingerprint": "5ade0f1d",
+      "fingerprint": "396f4840",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.9,
@@ -216,11 +266,13 @@
       "revision_round": 1,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-07",
-      "fingerprint": "2f77f516",
+      "fingerprint": "12ae5ae5",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.9,
@@ -242,11 +294,13 @@
       "revision_round": 1,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-08",
-      "fingerprint": "680d75a2",
+      "fingerprint": "c97250b0",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.9,
@@ -268,11 +322,13 @@
       "revision_round": 1,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-09",
-      "fingerprint": "44f51673",
+      "fingerprint": "5a833369",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -310,11 +366,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": "\"I'd like you to set it up and write the first three posts.\" (2026-09-10)"
     },
     {
       "id": "REQ-10",
-      "fingerprint": "0189f982",
+      "fingerprint": "c692bd75",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -348,11 +406,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": "\"Half our visitors speak Spanish.\" (2026-09-10)"
     },
     {
       "id": "REQ-11",
-      "fingerprint": "fe97005e",
+      "fingerprint": "ea4904da",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.9,
@@ -374,11 +434,13 @@
       "revision_round": 2,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-12",
-      "fingerprint": "619766d6",
+      "fingerprint": "a1826af5",
       "status": "in",
       "class": "IN-SCOPE",
       "confidence": 0.9,
@@ -400,11 +462,13 @@
       "revision_round": 2,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-13",
-      "fingerprint": "e50b3171",
+      "fingerprint": "30900916",
       "status": "call",
       "class": "UNCLEAR",
       "confidence": 0.7,
@@ -426,11 +490,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-14",
-      "fingerprint": "230c88b6",
+      "fingerprint": "0e6dd8e8",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.85,
@@ -464,11 +530,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-15",
-      "fingerprint": "5776d947",
+      "fingerprint": "6f858819",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -506,11 +574,13 @@
       "revision_round": 3,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-16",
-      "fingerprint": "cbc3e478",
+      "fingerprint": "3d146296",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -548,11 +618,13 @@
       "revision_round": 3,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-17",
-      "fingerprint": "cf0a5790",
+      "fingerprint": "66d493a9",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -586,11 +658,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-18",
-      "fingerprint": "89d3361f",
+      "fingerprint": "4cc6e29a",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.9,
@@ -624,11 +698,13 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     },
     {
       "id": "REQ-19",
-      "fingerprint": "8c96e874",
+      "fingerprint": "710f666c",
       "status": "extra",
       "class": "OUT-OF-SCOPE",
       "confidence": 0.85,
@@ -662,7 +738,9 @@
       "revision_round": 0,
       "act": "request",
       "withdrawn_by": null,
-      "free_by": null
+      "free_by": null,
+      "later_mention": null,
+      "latest_related": null
     }
   ],
   "tone": "friendly"

@@ -62,6 +62,8 @@ def _card(f, group: str) -> list[str]:
         p.append(f"<dt>Withdrawn by</dt><dd>&ldquo;{_e(f.request.withdrawn_by)}&rdquo;</dd>")
     if f.free_by:
         p.append(f"<dt>You said</dt><dd>&ldquo;{_e(f.free_by)}&rdquo; (treated as included, never billed)</dd>")
+    if f.status == EXTRA and f.latest_related:
+        p.append(f"<dt>Latest related</dt><dd>{_e(f.latest_related)} <span class=meta>(the last thing the client said about this)</span></dd>")
     if e and f.status == EXTRA:
         calc = money(e["amount"], e["currency"])
         if e.get("hours") is not None:
@@ -98,9 +100,9 @@ def render_html(res, card: RateCard) -> str:
     ]
     if m.get("revision_limit"):
         parts.append(f"<p class=meta>Revision rounds used: {m['revision_rounds_used']} of {m['revision_limit']} included.</p>")
-    if m.get("skipped_total"):
-        parts.append(f"<p class=meta>Skipped on purpose: {m['skipped_total']} pleasantries, status questions or billing-admin "
-                     "sentences (listed in findings.json).</p>")
+    if m.get("other_client_messages_total"):
+        parts.append(f"<p class=meta>{m['other_client_messages_total']} other client sentences were not turned into items; "
+                     "they are listed at the bottom with the reason.</p>")
     for w in res.warnings:
         parts.append(f"<div class=warn>{_e(w)}</div>")
     parts.append("<div class=bar role=group aria-label=Filter>")
@@ -116,6 +118,15 @@ def render_html(res, card: RateCard) -> str:
             parts += _card(f, g)
     if not res.findings:
         parts.append("<p>No requests were found in the messages.</p>")
-    parts.append("<p class=foot>Generated locally by scopeguard 1.1.0. Not legal advice.</p>")
+    oth = m.get("other_client_messages") or []
+    if m.get("other_client_messages_total"):
+        parts.append(f"<details data-g='aside'><summary>Other client messages ({m['other_client_messages_total']}): everything the client "
+                     "wrote that was not turned into an item, with the reason</summary><ul>")
+        for o in oth[:150]:
+            parts.append(f"<li>{_e(o['quote'])} <span class=meta>({_e(o['why'])})</span></li>")
+        if m["other_client_messages_total"] > 150:
+            parts.append(f"<li class=meta>... and {m['other_client_messages_total'] - 150} more (the first 300 are in findings.json)</li>")
+        parts.append("</ul></details>")
+    parts.append("<p class=foot>Generated locally by scopeguard 1.1.1. Not legal advice.</p>")
     parts.append("<script>" + JS + "</script></main></body></html>")
     return "".join(parts)
