@@ -53,6 +53,14 @@ class Request:
     quote: str
     is_revision: bool = False
     revision_round: int = 0
+    extra_quotes: list = field(default_factory=list)   # consolidated duplicates / split parts
+    message_ids: list = field(default_factory=list)
+
+    def all_quotes(self) -> list:
+        return [self.quote] + list(self.extra_quotes)
+
+    def text(self) -> str:
+        return " ".join(self.all_quotes())
 
 
 @dataclass

@@ -30,7 +30,7 @@ also just really very much more some any one two three up down out over into abo
 how why get got let lets make makes made change changes changed add adds added adding want wants need needs
 like new site website page pages include included including includes project work works additional extra
 client provide provided have has had too still then than again all each both few other such only own same
-sure maybe think look looks looking see give take put go going able way thing things something anything
+setup functionality feature features system systems integration creation development sure maybe think look looks looking see give take put go going able way thing things something anything
 """.split())
 
 # word -> concept. A shared concept is a strong signal (weight 2); other shared words weigh 1.
@@ -43,7 +43,7 @@ _CONCEPT_GROUPS = {
     "logo": "logo logos brand branding identity rebrand",
     "production": "photography photographer photoshoot shoot video videos footage film drone",
     "seo": "seo backlink backlinks ranking rank keyword keywords",
-    "ads": "ads ad advertising ppc campaign campaigns adwords",
+    "ads": "ads ad advertising ppc campaign campaigns adwords paid",
     "hosting": "hosting domain domains dns renewal",
     "booking": "booking bookings appointment appointments reservation reservations calendly",
     "newsletter": "newsletter newsletters mailchimp mailing subscribe subscription",
@@ -112,3 +112,20 @@ NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, 
 def slug(text: str, n: int = 40) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return (s[:n].strip("-")) or "request"
+
+
+_PHRASE_SPLIT = re.compile(r"[,;/()]|\b(?:or|and|including|such as|for example|e\.g\.)\b", re.I)
+
+
+def phrases(text: str) -> list[str]:
+    return [p.strip() for p in _PHRASE_SPLIT.split(text or "") if p and p.strip()]
+
+
+def phrase_covered(request_tokens, phrase: str) -> bool:
+    """True when the request contains the whole phrase (short phrases) or at least two of its
+    content words (long phrases). A single shared word never matches a multi-word phrase."""
+    toks = set(concepts(phrase))
+    if not toks:
+        return False
+    hit = len(toks & set(request_tokens))
+    return hit == len(toks) if len(toks) <= 2 else hit >= 2

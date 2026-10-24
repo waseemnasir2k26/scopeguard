@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from .changeorder import draft, money
+from .changeorder import draft, headline, money
 from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .pipeline import Result
 from .rates import RateCard
@@ -26,15 +26,16 @@ def csv_safe(v) -> str:
 
 def write_csv(res: Result, path: Path) -> None:
     cols = ["id", "class", "confidence", "sender", "date", "quote", "clause_id", "clause_text", "rule", "reason",
-            "est_hours", "est_amount", "currency", "estimate_basis", "change_order_file"]
+            "est_hours", "est_hours_low", "est_hours_high", "est_amount", "est_amount_low", "est_amount_high", "currency", "estimate_basis", "change_order_file"]
     with path.open("w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
         w.writerow(cols)
         for f in res.findings:
             e = f.estimate or {}
-            row = [f.id, f.cls, f"{f.confidence:.2f}", f.request.sender, f.request.ts or "", f.request.quote,
+            row = [f.id, f.cls, f"{f.confidence:.2f}", f.request.sender, f.request.ts or "", " | ".join(f.request.all_quotes()),
                    f.clause_id or "", f.clause_text, f.rule or "", f.reason,
-                   e.get("hours", "") if e.get("hours") is not None else "", e.get("amount", ""),
+                   e.get("hours") if e.get("hours") is not None else "", e.get("hours_low") or "", e.get("hours_high") or "",
+                   e.get("amount", ""), e.get("amount_low", ""), e.get("amount_high", ""),
                    e.get("currency", ""), e.get("basis", ""), f.draft_file]
             w.writerow([csv_safe(x) for x in row])
 
@@ -48,12 +49,10 @@ def counts(res: Result) -> dict:
 
 def write_summary(res: Result, card: RateCard, path: Path) -> None:
     c = counts(res)
-    outs = [f for f in res.findings if f.cls == OUT_OF_SCOPE and f.estimate]
-    total = sum(f.estimate["amount"] for f in outs)
     m = res.meta
     L = ["# scopeguard summary", "",
          f"- Requests found: **{len(res.findings)}** (in-scope {c[IN_SCOPE]}, out-of-scope {c[OUT_OF_SCOPE]}, unclear {c[UNCLEAR]})",
-         f"- Estimated unbilled work in out-of-scope items: **{money(total, card.currency)}** (estimate from your rate card, not an invoice)",
+         f"- **{headline(res.findings, card.currency)}**. A rough band from your rate card, not an invoice.",
          f"- Model: `{m['llm']}`{' (cloud)' if m['cloud'] else ' (local)'}; redaction {'on' if m['redacted'] else 'off'}; took {m['seconds']} s",
          f"- Messages parsed: {m['messages']}; from the client: {m['client_messages']}"]
     if m["revision_limit"]:
@@ -73,7 +72,8 @@ def write_summary(res: Result, card: RateCard, path: Path) -> None:
             if f.estimate:
                 e = f.estimate
                 extra = f" Est. {money(e['amount'], e['currency'])}."
-            L.append(f"- **{f.id}** ({f.confidence:.2f}, {cite}) \"{f.request.quote}\" - {f.reason}{extra}")
+            quotes = " / ".join(f'"{q}"' for q in f.request.all_quotes())
+            L.append(f"- **{f.id}** ({f.confidence:.2f}, {cite}) {quotes} - {f.reason}{extra}")
         L.append("")
     path.write_text("\n".join(L), encoding="utf-8")
 
@@ -98,9 +98,10 @@ def write_all(res: Result, out_dir: str | Path, card: RateCard, tone: str = "fri
 def to_dict(res: Result) -> dict:
     return {
         "meta": res.meta,
+        "headline": headline(res.findings, res.meta.get("currency", "USD")),
         "warnings": res.warnings,
         "findings": [{
-            "id": f.id, "class": f.cls, "confidence": round(f.confidence, 2), "quote": f.request.quote,
+            "id": f.id, "class": f.cls, "confidence": round(f.confidence, 2), "quote": f.request.quote, "also_quoted": f.request.extra_quotes,
             "sender": f.request.sender, "date": f.request.ts, "clause_id": f.clause_id,
             "clause_text": f.clause_text or None, "rule": f.rule, "reason": f.reason, "title": f.title,
             "estimate": f.estimate, "change_order_file": f.draft_file or None, "notes": f.notes,

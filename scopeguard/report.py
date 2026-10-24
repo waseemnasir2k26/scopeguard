@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from html import escape
 
-from .changeorder import money
+from .changeorder import headline, money
 from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .rates import RateCard
 
@@ -40,7 +40,6 @@ def render_html(res, card: RateCard) -> str:
     c = {IN_SCOPE: 0, OUT_OF_SCOPE: 0, UNCLEAR: 0}
     for f in res.findings:
         c[f.cls] += 1
-    total = sum(f.estimate["amount"] for f in res.findings if f.cls == OUT_OF_SCOPE and f.estimate)
     m = res.meta
     parts = [
         "<!doctype html><html lang=en><head><meta charset=utf-8>",
@@ -50,8 +49,8 @@ def render_html(res, card: RateCard) -> str:
         "<h1>scopeguard report</h1>",
         f"<p class=sub>{_e(m['llm'])} ({'cloud' if m['cloud'] else 'local'}) &middot; {m['requests']} requests &middot; "
         f"{m['seconds']} s &middot; redaction {'on' if m['redacted'] else 'off'}</p>",
-        f"<p>Estimated unbilled work in out-of-scope items: <strong>{_e(money(total, card.currency))}</strong> "
-        "<span class=meta>(estimate from your rate card, not an invoice)</span></p>",
+        f"<p><strong>{_e(headline(res.findings, card.currency))}</strong> "
+        "<span class=meta>(a rough band from your rate card, not an invoice)</span></p>",
         "<p class=meta>Draft analysis only. A model made these calls; you decide what to raise. Nothing was sent to anyone.</p>",
     ]
     if m.get("revision_limit"):
@@ -69,7 +68,8 @@ def render_html(res, card: RateCard) -> str:
         parts.append(f"<section class='card {f.cls}' data-c='{f.cls}'>")
         parts.append(f"<div class=tag>{_e(f.cls)} &middot; {_e(f.id)} &middot; confidence {f.confidence:.2f}"
                      f"{' &middot; rule: ' + _e(f.rule) if f.rule else ''}</div>")
-        parts.append(f"<blockquote>{_e(f.request.quote)}</blockquote>")
+        for q in f.request.all_quotes():
+            parts.append(f"<blockquote>{_e(q)}</blockquote>")
         parts.append(f"<div class=meta>{_e(f.request.sender)} &middot; {_e(when)}</div>")
         parts.append("<dl>")
         if f.clause_id:
@@ -79,8 +79,11 @@ def render_html(res, card: RateCard) -> str:
             parts.append("<dt>Clause</dt><dd>no matching clause</dd>")
         parts.append(f"<dt>Why</dt><dd>{_e(f.reason)}</dd>")
         if e:
-            calc = (f"{e['hours']:g} h x {money(e['rate'], e['currency'])}/h = " if e.get("hours") is not None else "") \
-                + money(e["amount"], e["currency"])
+            calc = money(e["amount"], e["currency"])
+            if e.get("hours") is not None:
+                calc = (f"{e['hours']:g} h x {money(e['rate'], e['currency'])}/h = {calc}, range "
+                        f"{money(e['amount_low'], e['currency'])} to {money(e['amount_high'], e['currency'])} "
+                        f"({e['hours_low']:g}-{e['hours_high']:g} h)")
             parts.append(f"<dt>Estimate</dt><dd>{_e(calc)} <span class=meta>(estimate; basis: {_e(e['basis'])})</span></dd>")
         if f.draft_file:
             parts.append(f"<dt>Draft</dt><dd><code>{_e(f.draft_file)}</code> (never sent)</dd>")

@@ -16,4 +16,4 @@ Best,
 [Your name]
 
 ---
-_Basis: rate card: Translation of the site (fixed). Classified OUT-OF-SCOPE with confidence 1.00. Reason: The SOW explicitly excludes this (C14 (SOW 3.3)). The SOW explicitly excludes translation or a multilingual version of the site (C14), so a Spanish version is not included._
+_Basis: rate card: Translation of the site (fixed). Classified OUT-OF-SCOPE with confidence 0.90. Reason: The SOW explicitly excludes this (C14 (SOW 3.3))._

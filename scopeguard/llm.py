@@ -211,10 +211,22 @@ class MockLLM(Backend):
             out = dict(**{"class": UNCLEAR}, clause_id=None, confidence=0.35,
                        reason="Too vague to map to a clause.", estimated_hours=None)
         else:
-            out = dict(**{"class": OUT_OF_SCOPE}, clause_id=None, confidence=0.55,
-                       reason="No clause covers this request.", estimated_hours=2.0)
+            out = dict(**{"class": UNCLEAR}, clause_id=None, confidence=0.3,
+                       reason="No clause covers this request; the SOW is silent.", estimated_hours=2.0)
         out["title"] = " ".join(quote.rstrip("?.! ").split()[:8])
         return json.dumps(out)
+
+
+class NoLLM(Backend):
+    """Rules-only mode: every request the deterministic layer does not decide is UNCLEAR."""
+    name = "none"
+    model = "rules-only"
+
+    def chat(self, system: str, user: str, schema: Optional[dict] = None) -> str:
+        if "EXTRACT_JSON:" in user:
+            return json.dumps({"requests": []})
+        return json.dumps({"class": UNCLEAR, "clause_id": None, "confidence": 0.0,
+                           "reason": "Rules-only mode: no model consulted.", "estimated_hours": None, "title": ""})
 
 
 def ollama_available() -> bool:
@@ -229,6 +241,8 @@ def make_backend(kind: str = "auto", allow_cloud: bool = False, model: Optional[
     kind = (kind or "auto").lower()
     if kind == "mock":
         return MockLLM()
+    if kind in ("none", "rules"):
+        return NoLLM()
     if kind == "ollama":
         return OllamaLLM(model)
     if kind == "groq":

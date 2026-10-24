@@ -45,7 +45,8 @@ def test_estimate_rate_card_task_beats_llm_hours():
                                            Task(match=["translation"], fixed=450, label="Translate")])
     assert estimate("Could we have a blog?", 1, card) == {
         "currency": "USD", "rate": 60.0, "is_estimate": True, "placeholder_rate": False,
-        "hours": 6.0, "amount": 360.0, "basis": "rate card: Blog"}
+        "hours": 6.0, "amount": 360.0, "basis": "rate card: Blog",
+        "hours_low": 4.5, "hours_high": 9.0, "amount_low": 270.0, "amount_high": 540.0}
     fixed = estimate("a Spanish translation of the site", 1, card)
     assert fixed["amount"] == 450.0 and fixed["hours"] is None
     assert estimate("blog", 1, card, use_tasks=False)["hours"] == 1.0
@@ -105,7 +106,7 @@ EVIL = '<script>alert(1)</script> "quoted" & =HYPERLINK("http://evil.example")'
 def _run_evil(tmp_path):
     msgs = [Message(id="", sender="<b>Sam</b>", text=f"Can you add {EVIL} please?")]
     llm = FakeLLM(fn=lambda s, u: json.dumps({
-        "class": "OUT-OF-SCOPE", "clause_id": None, "confidence": 0.9,
+        "class": "OUT-OF-SCOPE", "clause_id": "C3", "confidence": 0.9,
         "reason": "<img src=x onerror=alert(1)>", "estimated_hours": 2, "title": "=cmd|' /C calc'!A0"}))
     res = analyze(SOW, messages=msgs, opts=Options(llm=llm))
     write_all(res, tmp_path / "out", RateCard())
@@ -163,7 +164,7 @@ def test_redact_masks_emails_and_phones():
 
 def test_redact_flag_keeps_pii_out_of_every_prompt():
     msgs = [Message(id="", sender="Sam Client",
-                    text="Please send the invoice to accounts@client.example or call +1 555 0142 about the new shop.")]
+                    text="Please add a careers page, and email accounts@client.example or call +1 555 0142 with questions.")]
     for flag in (True, False):
         llm = FakeLLM(fn=lambda s, u: json.dumps({"class": "UNCLEAR", "clause_id": None, "confidence": 0.5,
                                                   "reason": "", "estimated_hours": None, "title": "t"}))
@@ -223,9 +224,13 @@ def test_server_requires_token_and_validates_body(server):
     assert _post(server, {"messages": ""}, token="tok")[0] == 400
     req = urllib.request.Request(server + "/analyze", data=b"x" * 1_000_001,
                                  headers={"Authorization": "Bearer tok"}, method="POST")
-    with pytest.raises(urllib.error.HTTPError) as ei:
+    try:
         urllib.request.urlopen(req, timeout=20)
-    assert ei.value.code == 413
+        raise AssertionError("oversize body was accepted")
+    except urllib.error.HTTPError as e:      # 413, or the server may drop the connection mid-upload
+        assert e.code == 413
+    except (ConnectionError, urllib.error.URLError):
+        pass
     with urllib.request.urlopen(server + "/healthz") as r:
         assert json.loads(r.read())["ok"] is True
     with pytest.raises(urllib.error.HTTPError) as ei:

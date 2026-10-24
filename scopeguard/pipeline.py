@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 from .changeorder import estimate
 from .classify import classify_all
-from .extract import find_evidence, heuristic_requests, llm_requests, merge_requests
+from .extract import consolidate, find_evidence, heuristic_requests, llm_requests, merge_requests
 from .messages import load_messages
 from .models import OUT_OF_SCOPE, Finding, Message, Sow
 from .rates import RateCard
@@ -103,7 +103,8 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
             dropped += 1
             continue
         kept.append(r)
-    requests = kept
+    n_before = len(kept)
+    requests = consolidate(kept, client_msgs)      # split / duplicate asks become one item
     for i, r in enumerate(requests, 1):
         r.id = f"Q{i}"
     assign_revision_rounds(requests)
@@ -117,9 +118,9 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
                                    use_tasks=f.rule != "revision_limit")
         else:
             f.estimate = None
-    meta = {"llm": opts.llm.label(), "cloud": bool(getattr(opts.llm, "is_cloud", False)), "redacted": opts.redact,
+    meta = {"currency": opts.rates.currency, "llm": opts.llm.label(), "cloud": bool(getattr(opts.llm, "is_cloud", False)), "redacted": opts.redact,
             "seconds": round(time.time() - t0, 1), "messages": len(messages), "client_messages": len(client_msgs),
-            "requests": len(requests), "dropped_by_evidence_rule": dropped, "tone": opts.tone,
+            "requests": len(requests), "merged_duplicates": n_before - len(requests), "dropped_by_evidence_rule": dropped, "tone": opts.tone,
             "revision_limit": sow.revision_limit,
             "revision_rounds_used": max((r.revision_round for r in requests), default=0)}
     return Result(sow=sow, messages=messages, client_messages=client_msgs, findings=findings,

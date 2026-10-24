@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -91,6 +92,25 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def cmd_eval(args) -> int:
+    from .evaluate import format_report, load_labels, run_eval
+    llm = make_backend(args.llm, args.allow_cloud, args.model)
+    sow = parse_sow(load_text(args.sow))
+    items = load_labels(args.labels)
+
+    def prog(i, n, row):
+        print(f"  [{i}/{n}] {'ok  ' if row['ok'] else 'MISS'} {row['got']:12s} {row['text'][:60]}", file=sys.stderr)
+
+    res = run_eval(sow, items, llm, args.min_confidence, prog if args.verbose else None)
+    print(format_report(res))
+    if args.json:
+        Path(args.json).write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
+    if not res["revision_cases"]["all_correct"]:
+        print("FAIL: not every revision case was classified correctly", file=sys.stderr)
+        return 3
+    return 0
+
+
 def cmd_init(args) -> int:
     p = Path(args.path)
     if p.exists() and not args.force:
@@ -130,6 +150,17 @@ def main(argv=None) -> int:
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--token", help="required for non-loopback hosts (or set SCOPEGUARD_TOKEN)")
     s.set_defaults(fn=cmd_serve)
+
+    e = sub.add_parser("eval", help="measure accuracy on a labelled request set (see examples/eval/labels.json)")
+    e.add_argument("--sow", required=True)
+    e.add_argument("--labels", required=True)
+    e.add_argument("--llm", default="none", help="none (rules only, default), mock, ollama, groq, gemini")
+    e.add_argument("--model")
+    e.add_argument("--allow-cloud", action="store_true")
+    e.add_argument("--min-confidence", type=float, default=0.5)
+    e.add_argument("--json", help="also write the full result here")
+    e.add_argument("-v", "--verbose", action="store_true")
+    e.set_defaults(fn=cmd_eval)
 
     i = sub.add_parser("init", help="write a sample rates.yaml")
     i.add_argument("path", nargs="?", default="rates.yaml")

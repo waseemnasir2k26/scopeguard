@@ -1,13 +1,16 @@
-"""Deterministic rule layer. Runs after the LLM and wins over it for two cases:
-explicit SOW exclusions and revision-count limits."""
+"""Deterministic layer. It runs BEFORE any LLM call and its verdicts are final:
+
+1. explicit SOW exclusions, matched by phrase (not by a single shared word);
+2. revision-type requests, counted against the SOW's revision allowance.
+"""
 from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Iterable
+from typing import Iterable, Optional
 
-from .models import OUT_OF_SCOPE, Finding, Request, Sow
-from .textutil import overlap
+from .models import IN_SCOPE, OUT_OF_SCOPE, Clause, Request, Sow
+from .textutil import concepts, overlap, phrase_covered, phrases
 
 ROUND_GAP_MINUTES = 30
 _CLIENT_DUTY = re.compile(r"\b(client|customer)\b.{0,40}\b(suppl|provid|send|deliver)", re.I)
@@ -39,46 +42,47 @@ def assign_revision_rounds(requests: Iterable[Request], gap_minutes: int = ROUND
     return rounds
 
 
-def match_exclusion(quote: str, sow: Sow):
-    """Best explicit-exclusion clause for a request, or None. Fires only when the exclusion
-    overlaps strictly more than any deliverable clause (so 'add analytics' is not blocked by an
-    exclusion about advanced analytics when a deliverable clearly covers it)."""
+def match_exclusion(text: str, sow: Sow) -> Optional[Clause]:
+    """The exclusion clause whose phrase the request contains, or None.
+
+    Matching is per phrase of the clause ("Logo or brand design" -> "Logo", "brand design"):
+    a short phrase must be fully present in the request, a long one needs two content words.
+    It also must not be explained better by a deliverable clause (so 'install Google Analytics'
+    is not blocked by 'advanced analytics dashboards are not included')."""
+    toks = set(concepts(text))
     best, score = None, 0
     for c in sow.clauses:
-        if c.kind == "exclusion":
-            s = overlap(quote, c.text)
+        if c.kind != "exclusion":
+            continue
+        if any(phrase_covered(toks, p) for p in phrases(c.text)):
+            s = overlap(text, c.text)
             if s > score:
                 best, score = c, s
-    if best is None or score < 2:
+    if best is None:
         return None
-    deliv = max((overlap(quote, c.text) for c in sow.clauses
-                   if c.kind == "deliverable" and not _CLIENT_DUTY.search(c.text)), default=0)
+    deliv = max((overlap(text, c.text) for c in sow.clauses
+                 if c.kind == "deliverable" and not _CLIENT_DUTY.search(c.text)), default=0)
     return best if score > deliv else None
 
 
-def apply_rules(f: Finding, sow: Sow) -> Finding:
-    """Mutates and returns the finding."""
-    # Revisions of existing work ("make the logo bigger") are governed by the revision limit,
-    # not by exclusions such as "logo design is not included".
-    ex = None if f.request.is_revision else match_exclusion(f.request.quote, sow)
-    if ex is not None:
-        if f.cls != OUT_OF_SCOPE or f.clause_id != ex.id:
-            f.notes.append(f"Rule layer overrode the model ({f.llm_class or f.cls} -> {OUT_OF_SCOPE}).")
-        f.cls, f.clause_id, f.clause_text, f.clause_ref = OUT_OF_SCOPE, ex.id, ex.text, ex.ref
-        f.rule = "explicit_exclusion"
-        f.confidence = max(f.confidence, 0.9)
-        f.reason = f"The SOW explicitly excludes this ({ex.cite()}). " + (f.reason if f.llm_class == OUT_OF_SCOPE else "")
-        return f
-    if sow.revision_limit and f.request.is_revision and f.request.revision_round > sow.revision_limit:
-        rc = sow.by_id(sow.revision_clause) if sow.revision_clause else None
-        if f.cls != OUT_OF_SCOPE:
-            f.notes.append(f"Rule layer overrode the model ({f.llm_class or f.cls} -> {OUT_OF_SCOPE}).")
-        f.cls = OUT_OF_SCOPE
-        if rc:
-            f.clause_id, f.clause_text, f.clause_ref = rc.id, rc.text, rc.ref
-        f.rule = "revision_limit"
-        f.confidence = max(f.confidence, 0.9)
-        f.reason = (f"Revision round {f.request.revision_round} of this project; the SOW includes "
-                    f"{sow.revision_limit}. Rounds are counted heuristically (messages less than "
-                    f"{ROUND_GAP_MINUTES} minutes apart are one round).")
-    return f
+def precheck(req: Request, sow: Sow) -> Optional[dict]:
+    """Final verdict from rules alone, or None when the LLM should decide.
+
+    Returns {cls, clause, rule, confidence, reason}."""
+    if not req.is_revision:
+        ex = match_exclusion(req.text(), sow)
+        if ex is not None:
+            return {"cls": OUT_OF_SCOPE, "clause": ex, "rule": "explicit_exclusion", "confidence": 0.9,
+                    "reason": f"The SOW explicitly excludes this ({ex.cite()})."}
+        return None
+    # revision-type request: governed by the revision allowance, never by an exclusion keyword
+    if not sow.revision_limit:
+        return None
+    rc = sow.by_id(sow.revision_clause) if sow.revision_clause else None
+    n = req.revision_round or 1
+    if n <= sow.revision_limit:
+        return {"cls": IN_SCOPE, "clause": rc, "rule": "revision_allowance", "confidence": 0.9,
+                "reason": f"A revision of existing work: round {n} of the {sow.revision_limit} included."}
+    return {"cls": OUT_OF_SCOPE, "clause": rc, "rule": "revision_limit", "confidence": 0.9,
+            "reason": (f"Revision round {n}; the SOW includes {sow.revision_limit}. Rounds are counted "
+                       f"heuristically (messages less than {ROUND_GAP_MINUTES} minutes apart are one round).")}

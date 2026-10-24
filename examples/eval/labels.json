@@ -1,0 +1,271 @@
+{
+ "note": "Synthetic labelled requests for examples/sow.md (two revision rounds included). round = which revision round the request falls in.",
+ "items": [
+  {
+   "id": "L01",
+   "text": "Can you make the logo bigger in the header?",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L02",
+   "text": "Could you change the hero photo to the harbour one I sent?",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L03",
+   "text": "Please swap the order of the services so Branding comes first.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L04",
+   "text": "Fix the typo in the About page headline, it says Hrabor.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L05",
+   "text": "Make the footer text smaller please.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L06",
+   "text": "Change the button text from Contact to Get in touch.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 1
+  },
+  {
+   "id": "L07",
+   "text": "Can we try a darker blue for the buttons?",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 2
+  },
+  {
+   "id": "L08",
+   "text": "Please move the contact form above the map.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 2
+  },
+  {
+   "id": "L09",
+   "text": "Could you adjust the spacing between the gallery images?",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 2
+  },
+  {
+   "id": "L10",
+   "text": "Tweak the menu font to something rounder.",
+   "expect": "IN-SCOPE",
+   "tag": "revision",
+   "round": 2
+  },
+  {
+   "id": "L11",
+   "text": "Can you change the heading font to something rounder?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "revision",
+   "round": 3
+  },
+  {
+   "id": "L12",
+   "text": "Please make the footer colour match the logo.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "revision",
+   "round": 3
+  },
+  {
+   "id": "L13",
+   "text": "Move the testimonials above the gallery.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "revision",
+   "round": 3
+  },
+  {
+   "id": "L14",
+   "text": "Can you make the banner image bigger again?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "revision",
+   "round": 4
+  },
+  {
+   "id": "L15",
+   "text": "Can we add an online shop so people can buy our prints?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L16",
+   "text": "Could we also have a blog?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L17",
+   "text": "Can you write the text for the Services page?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L18",
+   "text": "How about a Spanish version of the whole site too?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L19",
+   "text": "Please add a booking calendar so clients can book a studio visit.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L20",
+   "text": "Can you connect our newsletter signup to Mailchimp?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L21",
+   "text": "We need a new logo designed, can you do that too?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L22",
+   "text": "Could you shoot a short video of the studio for the homepage?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L23",
+   "text": "Can you run Google Ads for the launch month?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L24",
+   "text": "Please renew our domain and sort out the hosting.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L25",
+   "text": "Can you also do ongoing SEO every month to rank us on Google?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L26",
+   "text": "Could you also handle our monthly website updates after launch?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "exclusion"
+  },
+  {
+   "id": "L27",
+   "text": "Please add a sixth page for our Careers section.",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "beyond"
+  },
+  {
+   "id": "L28",
+   "text": "Can the gallery show 30 photos?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "beyond"
+  },
+  {
+   "id": "L29",
+   "text": "Can you add a members area where clients log in?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "silent"
+  },
+  {
+   "id": "L30",
+   "text": "Please make sure the whole site works well on phones.",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L31",
+   "text": "Can you install Google Analytics so we can see visitors?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L32",
+   "text": "Could you add alt text to all the gallery images?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L33",
+   "text": "Can the contact form email enquiries to info@harborlight.example?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L34",
+   "text": "Please link our Instagram and Facebook icons in the footer.",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L35",
+   "text": "Can you compress the images so the site loads fast?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L36",
+   "text": "Please put meta descriptions on each page.",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L37",
+   "text": "Could the portfolio gallery show 20 photos?",
+   "expect": "IN-SCOPE",
+   "tag": "deliverable"
+  },
+  {
+   "id": "L38",
+   "text": "Could you make the site feel more premium?",
+   "expect": "UNCLEAR",
+   "tag": "vague"
+  },
+  {
+   "id": "L39",
+   "text": "Can you make it pop a bit more?",
+   "expect": "UNCLEAR",
+   "tag": "vague"
+  },
+  {
+   "id": "L40",
+   "text": "Make it better please.",
+   "expect": "UNCLEAR",
+   "tag": "vague"
+  },
+  {
+   "id": "L41",
+   "text": "Could you look into why the site feels slow for some visitors?",
+   "expect": "UNCLEAR",
+   "tag": "vague"
+  },
+  {
+   "id": "L42",
+   "text": "Can we talk about adding something for events later?",
+   "expect": "UNCLEAR",
+   "tag": "vague"
+  }
+ ]
+}

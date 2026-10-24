@@ -43,26 +43,29 @@ def test_revision_rounds_without_timestamps_use_messages():
     assert assign_revision_rounds(reqs) == 2
 
 
-def test_revision_limit_rule_overrides_llm():
+def test_revision_allowance_then_limit_decided_before_the_llm():
     reqs = [rq(i, f"M{i}", "Can you change the heading colour?", f"2026-03-0{i}T10:00:00") for i in (1, 2, 3)]
     assign_revision_rounds(reqs)
-    fs = classify_all(reqs, SOW, MockLLM())
-    third = fs[2]
-    assert third.cls == OUT_OF_SCOPE and third.rule == "revision_limit"
-    assert third.clause_id == "C3"
-    assert "round 3" in third.reason and "2" in third.reason
-    assert fs[0].rule is None and fs[1].rule is None
+    llm = FakeLLM(fn=lambda s, u: json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C1", "confidence": 1.0,
+                                              "reason": "wrong", "estimated_hours": 1.5, "title": "heading colour"}))
+    fs = classify_all(reqs, SOW, llm)
+    assert [f.cls for f in fs] == [IN_SCOPE, IN_SCOPE, OUT_OF_SCOPE]
+    assert [f.rule for f in fs] == ["revision_allowance", "revision_allowance", "revision_limit"]
+    assert fs[0].clause_id == "C3" and fs[2].clause_id == "C3"
+    assert "round 3" in fs[2].reason.lower() and "2" in fs[2].reason
+    assert len(llm.prompts) == 1          # only the out-of-scope item asked the model (for hours); IN revisions never did
+    assert fs[2].estimate["llm_hours"] == 1.5
 
 
 # ---------------------------------------------------------------- exclusions
 def test_explicit_exclusion_beats_llm_in_scope_verdict():
     llm = FakeLLM(replies=[json.dumps({"class": "IN-SCOPE", "clause_id": "C1", "confidence": 0.95,
-                                       "reason": "pages", "estimated_hours": None, "title": "shop"})])
+                                       "reason": "pages", "estimated_hours": 8, "title": "shop"})])
     r = rq(1, "M1", "Can we add an online shop to sell prints?")
     [f] = classify_all([r], SOW, llm)
     assert f.cls == OUT_OF_SCOPE and f.rule == "explicit_exclusion"
     assert f.clause_id == "C4" and f.confidence >= 0.9
-    assert any("overrode" in n for n in f.notes)
+    assert f.estimate["llm_hours"] == 8 and f.title == "shop"   # the model only supplies hours and a title
 
 
 def test_revision_requests_are_not_blocked_by_exclusions():
@@ -72,7 +75,7 @@ def test_revision_requests_are_not_blocked_by_exclusions():
     assert r.is_revision
     assign_revision_rounds([r])
     [f] = classify_all([r], sow, MockLLM())
-    assert f.rule is None
+    assert f.rule == "revision_allowance" and f.cls == IN_SCOPE
     r2 = rq(2, "M2", "Could you design a new logo for us?")
     assert not r2.is_revision
     [f2] = classify_all([r2], sow, MockLLM())
@@ -102,9 +105,12 @@ def test_validate_in_scope_without_citation_is_unclear():
     assert v["cls"] == UNCLEAR
 
 
-def test_validate_out_of_scope_keeps_null_clause():
+def test_validate_out_of_scope_without_clause_is_unclear():
     v = validate({"class": "OUT-OF-SCOPE", "clause_id": None, "confidence": 0.8, "estimated_hours": 3}, SOW, 0.5)
-    assert v["cls"] == OUT_OF_SCOPE and v["clause"] is None and v["hours"] == 3.0
+    assert v["cls"] == UNCLEAR and v["clause"] is None and v["hours"] == 3.0
+    assert any("without a valid clause" in n for n in v["notes"])
+    ok = validate({"class": "OUT-OF-SCOPE", "clause_id": "C4", "confidence": 0.8, "estimated_hours": 3}, SOW, 0.5)
+    assert ok["cls"] == OUT_OF_SCOPE and ok["clause"].id == "C4"
 
 
 def test_validate_low_confidence_and_bad_values():
@@ -154,7 +160,7 @@ def test_mock_llm_classification_mix():
 
 def test_json_extraction_and_retry():
     assert extract_json('Sure!\n```json\n{"a": {"b": "}"}}\n``` bye') == {"a": {"b": "}"}}
-    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": None, "confidence": 0.8, "reason": "r",
+    good = json.dumps({"class": "OUT-OF-SCOPE", "clause_id": "C4", "confidence": 0.8, "reason": "r",
                        "estimated_hours": 2, "title": "t"})
     llm = FakeLLM(replies=["I think it is out of scope", good])
     [f] = classify_all([rq(1, "M1", "Please add a podcast page for us.", rev=False)], SOW, llm)
@@ -173,3 +179,73 @@ def test_heuristic_extraction_skips_chatter():
     reqs = heuristic_requests(msgs)
     assert [r.quote for r in reqs] == ["Could you also add a careers page?"]
     assert LLMError  # exported
+
+
+# ---------------------------------------------------------------- consolidation / phrases / headline / eval
+def test_split_request_is_consolidated_into_one_item():
+    from scopeguard.extract import consolidate
+    msg = Message(id="M1", sender="Dana", text="Could we also have a blog? I'd like you to set it up and write the first three posts.",
+                  ts="2026-03-01T10:00:00")
+    reqs = heuristic_requests([msg])
+    assert len(reqs) == 2
+    [one] = consolidate(reqs, [msg])
+    assert one.quote == "Could we also have a blog?" and len(one.extra_quotes) == 1
+    assert "write the first three posts" in one.text()
+
+
+def test_duplicate_across_messages_within_window_but_not_beyond():
+    from scopeguard.extract import consolidate
+    msgs = [Message(id="M1", sender="Dana", text="Can we add an online shop for prints?", ts="2026-03-01T10:00:00"),
+            Message(id="M2", sender="Dana", text="Any news on the online shop idea? Please add the shop soon.", ts="2026-03-03T10:00:00"),
+            Message(id="M3", sender="Dana", text="Please add the online shop now.", ts="2026-04-20T10:00:00")]
+    items = consolidate(heuristic_requests(msgs), msgs)
+    assert len(items) == 2 and len(items[0].extra_quotes) >= 1       # M3 is 7+ days later: separate item
+
+
+def test_different_requests_and_revisions_are_not_merged():
+    from scopeguard.extract import consolidate
+    msgs = [Message(id="M1", sender="Dana", text="Can you make the logo bigger? Also please make the footer colour match the logo.",
+                    ts="2026-03-01T10:00:00")]
+    assert len(consolidate(heuristic_requests(msgs), msgs)) == 2
+
+
+def test_exclusion_needs_a_phrase_not_one_word():
+    sow = parse_sow("## Exclusions\n- Logo or brand design is not included.\n- Advanced analytics dashboards are not included.\n"
+                    "- Paid advertising is not included.\n".replace("\\n", chr(10)))
+    assert match_exclusion("Please install Google Analytics", sow) is None            # one shared word
+    assert match_exclusion("We need a new logo designed", sow) is not None
+    assert match_exclusion("Can you run paid Google Ads", sow) is not None
+    assert match_exclusion("Can you add an advanced chart to the page", sow) is None   # one word of a 3-word phrase
+
+
+def test_headline_counts_each_consolidated_item_once_and_gives_a_range():
+    from scopeguard.changeorder import estimate, headline
+    from scopeguard.models import Finding
+    from scopeguard.rates import RateCard
+    card = RateCard(hourly_rate=100)
+    r = rq(1, "M1", "Could we also have a blog?", rev=False)
+    r.extra_quotes = ["I'd like you to set it up and write the first three posts."]
+    f = Finding(id="REQ-01", request=r, cls=OUT_OF_SCOPE, confidence=0.9, clause_id="C5")
+    f.estimate = estimate(r.text(), 4, card)
+    nocite = Finding(id="REQ-02", request=rq(2, "M2", "Add a podcast", rev=False), cls=OUT_OF_SCOPE, confidence=0.9)
+    nocite.estimate = estimate("x", 10, card)
+    h = headline([f, nocite], "USD")
+    assert h.startswith("Estimated extra work (review before sending): $300.00 to $600.00 across 1 items (3-6 h")
+
+
+def test_eval_rules_only_gets_every_revision_case_right(examples):
+    from scopeguard.evaluate import load_labels, run_eval
+    from scopeguard.llm import NoLLM
+    sow = parse_sow((examples / "sow.md").read_text(encoding="utf-8"))
+    res = run_eval(sow, load_labels(examples / "eval" / "labels.json"), NoLLM())
+    assert res["revision_cases"]["all_correct"] and res["revision_cases"]["n"] >= 12
+    assert res["per_class"][OUT_OF_SCOPE]["precision"] == 1.0 and res["per_class"][IN_SCOPE]["precision"] == 1.0
+
+
+def test_eval_mock_accuracy_floor_and_cli(examples, capsys):
+    from scopeguard.cli import main
+    rc = main(["eval", "--sow", str(examples / "sow.md"), "--labels", str(examples / "eval" / "labels.json"), "--llm", "mock"])
+    out = capsys.readouterr().out
+    assert rc == 0 and "revision cases: 14/14 correct" in out
+    acc = float(out.split("overall accuracy:")[1].split("%")[0])
+    assert acc >= 85.0

@@ -23,10 +23,12 @@ _SKIP = re.compile(
     r"^(thanks|thank you|thx|ok(ay)?|great|perfect|nice|cool|sounds good|looks (great|good)|love it|got it|"
     r"yes|yep|no problem|hi|hello|hey|good (morning|evening)|will do)\b[^?]*$", re.I)
 _STATUS = re.compile(r"\b(when will|any update|how long|what'?s the (status|eta)|did you (get|receive|see)|are you (there|free|available))\b", re.I)
+_ADMIN = re.compile(r"\b(invoice|invoices|receipt|bank details|payment schedule)\b", re.I)   # billing admin, not scope
 _REV_CUE = re.compile(
     r"\b(change|changing|tweak|adjust|revise|modify|redo|rework|swap|replace|recolou?r|rename|reposition|resize|"
     r"move|bigger|smaller|larger|darker|lighter|brighter|font|colou?r|instead of|different (colou?r|font|image|photo|layout|"
-    r"order)|order of)\b", re.I)
+    r"order)|order of|typo|typos|fix|correct|spelling|reword|shorten|lengthen|spacing|padding|margin|align(ed|ment)?|"
+    r"position|reorder|rearrange|enlarge|shrink|text size|headline|heading)\b", re.I)
 _NEW_CUE = re.compile(
     r"\b(add|adding|new|build|create|set ?up|integrate|connect|write|translate|install|launch|start|include|"
     r"also (want|need)|plus)\b", re.I)
@@ -51,7 +53,7 @@ def heuristic_requests(messages: Iterable[Message]) -> list[Request]:
     out: list[Request] = []
     for m in messages:
         for sent in split_sentences(m.text):
-            if len(sent.split()) < 4 or _SKIP.match(sent) or _STATUS.search(sent):
+            if len(sent.split()) < 4 or _SKIP.match(sent) or _STATUS.search(sent) or _ADMIN.search(sent):
                 continue
             if not _CUES.search(sent):
                 continue
@@ -125,3 +127,62 @@ def merge_requests(primary: list[Request], extra: list[Request]) -> list[Request
             continue
         merged.append(r)
     return merged
+
+
+# ---------------------------------------------------------------- consolidation
+_ANAPHOR = re.compile(r"\b(it|that|this|them|those|these)\b", re.I)
+WINDOW_DAYS = 7
+WINDOW_MESSAGES = 8
+
+
+def _toks(r: Request) -> set:
+    from .textutil import concepts
+    return set(concepts(r.quote))
+
+
+def _same_intent(a: Request, b: Request, order: dict) -> bool:
+    """a is an earlier consolidated item, b a later request from the same sender."""
+    from datetime import datetime
+    if a.sender != b.sender:
+        return False
+    # window: seven days when both have timestamps, else eight messages
+    if a.ts and b.ts:
+        try:
+            if abs((datetime.fromisoformat(b.ts) - datetime.fromisoformat(a.ts)).total_seconds()) > WINDOW_DAYS * 86400:
+                return False
+        except ValueError:
+            pass
+    elif abs(order.get(b.message_id, 0) - order.get(a.message_ids[-1] if a.message_ids else a.message_id, 0)) > WINDOW_MESSAGES:
+        return False
+    # split request: a short follow-up sentence that refers back ("set it up and write the first posts")
+    same_msg = a.message_id == b.message_id or a.message_ids and a.message_ids[-1] == b.message_id
+    if same_msg and len(b.quote.split()) <= 16 and _ANAPHOR.search(b.quote) and not b.is_revision:
+        return True
+    ta, tb = _toks(a), _toks(b)
+    if not ta or not tb:
+        return False
+    jac = len(ta & tb) / len(ta | tb)
+    if a.is_revision or b.is_revision:
+        return a.is_revision and b.is_revision and jac >= 0.6
+    strong = {t for t in ta & tb if t.startswith("c:")}
+    return jac >= 0.5 or bool(strong)
+
+
+def consolidate(requests: list, messages: list) -> list:
+    """Merge split and near-duplicate requests (same intent, same sender, inside a window) into one
+    item carrying several quotes, so each real ask is classified and priced once."""
+    order = {m.id: i for i, m in enumerate(messages)}
+    kept: list = []
+    for r in requests:
+        target = None
+        for k in reversed(kept[-WINDOW_MESSAGES:]):
+            if _same_intent(k, r, order):
+                target = k
+                break
+        if target is None:
+            r.message_ids = [r.message_id]
+            kept.append(r)
+        else:
+            target.extra_quotes.append(r.quote)
+            target.message_ids.append(r.message_id)
+    return kept

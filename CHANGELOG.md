@@ -11,4 +11,7 @@ First release.
 - `rates.yaml` rate card and change-order drafts (friendly/neutral/firm). Drafts are files; nothing is sent.
 - Outputs: `report.html`, `change-orders/*.md`, `scope-log.csv`, `summary.md`, `findings.json`.
 - `scopeguard watch`, `scopeguard serve` (loopback by default, token for anything else), n8n example workflow.
+- Deterministic layer decides first: revision requests against the SOW revision allowance, explicit exclusions by phrase. The model decides the rest and must cite a clause; clause-less OUT-OF-SCOPE becomes UNCLEAR.
+- Request consolidation (split and duplicate asks priced once); extra-work headline as a range.
+- `scopeguard eval` with a 42-item labelled set; `--llm none` rules-only mode.
 - `--redact` masks emails and phone numbers before any LLM call.

@@ -4,9 +4,13 @@
 ![Python 3.10+](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)
 ![Local first](https://img.shields.io/badge/LLM-local%20by%20default-informational.svg)
 
+![scopeguard report.html on the bundled example](docs/report-screenshot.png)
+
+_The top of `report.html` for the bundled synthetic example, produced by a 2.5 GB local model. Look closely at the first card: the model called "Meet the Team" an excluded blog item. That is a miss, left in on purpose. See "Measured accuracy" and "Limits"._
+
 **You agreed to five pages. Three weeks later it is a shop, a blog and a Spanish version, and saying "that's extra" feels rude. This does the awkward part for you.**
 
-Give scopeguard the agreed scope (SOW or proposal) and the client's messages (WhatsApp, email, Slack, Upwork). It finds every request, marks each one **IN-SCOPE**, **OUT-OF-SCOPE** or **UNCLEAR**, quotes the client's words, points at the SOW clause that decides it, and writes a polite change-order **draft** with an estimate from your own rate card. It never sends anything.
+Give scopeguard the agreed scope (SOW or proposal) and the client's messages (WhatsApp, email, Slack, Upwork). It finds every request, marks each one **IN-SCOPE**, **OUT-OF-SCOPE** or **UNCLEAR**, quotes the client's words, points at the SOW clause that decides it, and writes a polite change-order **draft** with an estimate range from your own rate card. It never sends anything.
 
 ## 2-minute quickstart
 
@@ -15,7 +19,7 @@ git clone https://github.com/waseemnasir2k26/scopeguard.git
 cd scopeguard
 pip install .            # Python 3.10+, one dependency (PyYAML). PDFs: pip install ".[pdf]"
 
-# offline demo, no model needed (lexical matching only; see "How it works")
+# offline demo, no model needed (rules + lexical matching; see "How it works")
 scopeguard analyze --sow examples/sow.md --messages examples/whatsapp-chat.txt \
   --client Dana --rates examples/rates.yaml --llm mock --out out
 
@@ -26,42 +30,59 @@ SCOPEGUARD_OLLAMA_MODEL=qwen3:8b scopeguard analyze --sow examples/sow.md \
 
 Open `out/report.html`. Create your own rate card with `scopeguard init`.
 
-You get, in `out/`:
-
-| File                 | What                                                               |
-| -------------------- | ------------------------------------------------------------------ |
-| `report.html`        | One self-contained page (no external requests), filter by class    |
-| `change-orders/*.md` | One draft per out-of-scope request. Review, edit, send it yourself |
-| `scope-log.csv`      | Every finding; spreadsheet-formula safe                            |
-| `summary.md`         | Counts, estimated unbilled work, revision rounds used              |
-| `findings.json`      | Same data for scripts                                              |
+| File in `out/`       | What                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `report.html`        | One self-contained page (no external requests), filter by class                     |
+| `change-orders/*.md` | One draft per out-of-scope item that cites a clause. Review, edit, send it yourself |
+| `scope-log.csv`      | Every finding; spreadsheet-formula safe                                             |
+| `summary.md`         | Counts, the extra-work range, revision rounds used                                  |
+| `findings.json`      | Same data for scripts                                                               |
 
 ## Real output
 
-Run on the bundled synthetic example (`examples/sow.md`, a 5-page website; `examples/whatsapp-chat.txt`, 21 client requests from a made-up client). Model: **`skynetlabs-assistant` via local Ollama (a 2.5 GB model), 157.6 s on one consumer GPU** (an earlier identical run took 52 s; the box was shared). Result: **6 in-scope, 13 out-of-scope, 2 unclear.** Full files are in [`examples/sample-output/`](examples/sample-output/).
+Bundled synthetic example: `examples/sow.md` (a 5-page website, two revision rounds included) and `examples/whatsapp-chat.txt` (a made-up client). Model: **`skynetlabs-assistant` via local Ollama, a 2.5 GB model; 24.2 s on one consumer GPU.** 19 requests after merging a split ask: **7 in-scope, 11 out-of-scope, 1 unclear.** Headline from the generated `summary.md`:
 
+> **Estimated extra work (review before sending): $3,465.00 to $6,480.00 across 11 items (50.25-100.5 h, plus 1 fixed-price).**
+
+Files: [`examples/sample-output/`](examples/sample-output/). All three revision rounds were decided by the rules, not the model: rounds 1 and 2 are IN-SCOPE ("make the logo bigger", "swap the order of the services", "darker blue for the buttons"), round 3 ("change the heading font", "make the footer colour match the logo") is OUT-OF-SCOPE with the revision clause cited.
+
+What this small model got wrong, so you can judge for yourself: it filed "Meet the Team" under the blog exclusion, and several hour guesses are inflated (the range above is wide because of them). A stronger model, or filling the `tasks:` list in your rate card with your own numbers, tightens it. Treat the figure as a prompt to review, not as an invoice.
+
+## Measured accuracy
+
+`scopeguard eval` scores the classifier against 42 labelled requests for the bundled SOW ([`examples/eval/labels.json`](examples/eval/labels.json)): 14 revision requests (rounds 1 to 4), 12 explicit exclusions, 3 "beyond a deliverable" or silent items, 8 deliverables, 5 vague ones. The labels were written by the project author, not blind, and the set is small. Read the numbers as a regression check, not a benchmark.
+
+| Path                                         | Overall | IN-SCOPE recall / precision | OUT-OF-SCOPE recall / precision | UNCLEAR recall / precision | Revision cases |
+| -------------------------------------------- | ------- | --------------------------- | ------------------------------- | -------------------------- | -------------- |
+| Rules only (`--llm none`)                    | 71.4%   | 56% / 100%                  | 79% / 100%                      | 100% / 29%                 | 14/14          |
+| Rules + offline mock (`--llm mock`)          | 90.5%   | 100% / 86%                  | 79% / 100%                      | 100% / 83%                 | 14/14          |
+| Rules + `skynetlabs-assistant` (local, 79 s) | 92.9%   | 94% / 100%                  | 100% / 86%                      | 60% / 100%                 | 14/14          |
+
+Rules-only means: whatever the deterministic layer does not decide becomes UNCLEAR, so it never invents an IN-SCOPE, and its precision on IN and OUT is 100% on this set. `scopeguard eval` exits non-zero if any revision case is wrong.
+
+Misses with the local model: it called "Could the portfolio gallery show 20 photos?" out of scope (the SOW says up to 24), and two vague requests ("look into why the site feels slow", "talk about events later") out of scope instead of unclear. Rules plus mock misses "renew our domain and sort out the hosting" (a deliverable mentions hosting, so the rule layer steps back), "a sixth page", "30 photos" and "a members area". Reproduce:
+
+```bash
+scopeguard eval --sow examples/sow.md --labels examples/eval/labels.json --llm none
+scopeguard eval --sow examples/sow.md --labels examples/eval/labels.json --llm mock
+SCOPEGUARD_OLLAMA_MODEL=skynetlabs-assistant scopeguard eval --sow examples/sow.md --labels examples/eval/labels.json --llm ollama
 ```
-REQ-03 OUT-OF-SCOPE  C12 explicit_exclusion  "One more thing, can we add an online shop so people can buy our prints?"
-REQ-09 OUT-OF-SCOPE  C13 explicit_exclusion  "Could we also have a blog?"                       6 h x $60 = $360 (rate card)
-REQ-16 OUT-OF-SCOPE  C10 revision_limit      "Can you change the heading font to something rounder?"   (revision round 3 of 2)
-REQ-14 UNCLEAR       no clause               "Could you make the site feel more premium?"
-REQ-02 IN-SCOPE      C4                      "And please make sure the whole site works well on phones."
-```
 
-Be honest about what this sample shows: the small model got several calls wrong (it called "make the logo bigger" out of scope, and the invoice-address message is not a scope question at all), it is over-confident (many 1.00 scores), and the headline "estimated unbilled work" of $6,390 is inflated by split and duplicate requests ("Could we also have a blog?" and "write the first three posts" are one ask). Use a stronger model for real work, and treat every row as a lead to check, not a verdict. The rule layer caught the exclusions and the third revision round regardless of the model.
+## How it works
 
-## How classification works
+Deterministic rules first, the model second.
 
 1. **Parse the SOW** (`.md`, `.txt`, `.pdf`, `.docx`) into numbered clauses (`C1`, `C2`, with the SOW's own numbering such as `1.1` kept). Each clause is tagged deliverable, exclusion, revision, timeline or other. "Two rounds of revisions" becomes a revision limit of 2.
 2. **Parse the messages** with tolerant parsers: WhatsApp (Android `12/03/2026, 14:05 - Name: text` and iOS `[12/03/26, 2:05:33 PM] Name: text`, day-first or month-first), `.eml`, `.mbox` (quoted replies stripped), Slack/Upwork `.json`, Slack/Upwork pasted `.txt`, plain pasted text.
-3. **Extract requests.** Heuristics split client messages into sentences and keep the ones that ask for something. `--llm-extract` adds an LLM pass. **Evidence rule:** a request is kept only if its quote appears verbatim in the messages (case and whitespace aside); anything else is dropped and counted.
-4. **Classify** each request with an LLM and a strict JSON schema (class, clause id, confidence, reason, estimated hours). Clause citations are checked against the real clauses: an invented clause is dropped and an IN-SCOPE verdict without a real clause becomes UNCLEAR. Below `--min-confidence` (default 0.5), IN/OUT becomes UNCLEAR.
-5. **Rule layer** (deterministic, wins over the model):
-   - _Explicit exclusion:_ the request overlaps an exclusion clause more than any deliverable does (word and concept overlap, e.g. "online shop" vs "e-commerce"). Revision requests are skipped here.
-   - _Revision limit:_ revision-type requests are grouped into rounds (same message, or messages under 30 minutes apart). Round 3 of 2 included is OUT-OF-SCOPE. Round counting is a heuristic; check it.
-6. **Estimate.** Hours come from your `rates.yaml` task match first, then the LLM's proposed hours, then your default; rounded up to a quarter hour, never below your minimum. Always labelled an estimate.
+3. **Extract requests.** Heuristics split client messages into sentences and keep the ones that ask for something (billing admin such as invoices is skipped). `--llm-extract` adds an LLM pass. **Evidence rule:** a request is kept only if its quote appears verbatim in the messages (case and whitespace aside); anything else is dropped and counted.
+4. **Consolidate.** A short follow-up that refers back ("set it up and write the first three posts") and near-duplicates from the same sender within 7 days (or 8 messages when there are no timestamps) are merged into one item with several quotes, by content-word overlap. Each item is classified and priced once. Revision requests are only merged with other revisions.
+5. **Rules decide first, no model involved:**
+   - _Revision requests_ (bigger, smaller, change a colour, move, swap text, font, tweak, adjust, fix a typo) are grouped into rounds (same message, or messages under 30 minutes apart) and compared with the SOW's allowance. Within the allowance: IN-SCOPE. Past it: OUT-OF-SCOPE with the revision clause cited. Exclusions never block a revision of existing work.
+   - _Explicit exclusions_ match by phrase: the clause is split into phrases ("Logo or brand design" becomes "Logo" and "brand design"); a short phrase must be fully present in the request, a long one needs two of its content words, so one shared word never matches. A deliverable that explains the request better wins.
+6. **The model decides the rest.** It must return IN/OUT/UNCLEAR plus a reason that cites a clause id, as strict JSON. Citations are checked against the real clauses. IN-SCOPE or OUT-OF-SCOPE without a valid clause becomes UNCLEAR; so does anything below `--min-confidence` (default 0.5). For items the rules already marked OUT, the model is asked only for hours and a title.
+7. **Estimate.** Hours come from your `rates.yaml` task match first, then the model's proposed hours, then your default; rounded up to a quarter hour, never below your minimum. Each item gets a plausible range of 0.75x to 1.5x of the point estimate (a stated, arbitrary band). The headline sums only OUT-OF-SCOPE items that cite a clause, each consolidated item once. Only those items get a change-order draft.
 
-Backends: local Ollama (`SCOPEGUARD_OLLAMA_MODEL`, else the first model Ollama lists), then opt-in cloud (`--llm groq` with `GROQ_API_KEY`, `--llm gemini` with `GEMINI_API_KEY`; `--llm auto --allow-cloud` falls back to them), or `--llm mock` for offline use. The cloud backends are implemented against the documented APIs but are not covered by the automated tests (they need keys).
+Backends: local Ollama (`SCOPEGUARD_OLLAMA_MODEL`, else the first model Ollama lists), then opt-in cloud (`--llm groq` with `GROQ_API_KEY`, `--llm gemini` with `GEMINI_API_KEY`; `--llm auto --allow-cloud` falls back to them), `--llm mock` for offline use, `--llm none` for rules only. The cloud backends follow the documented APIs but are not covered by the automated tests (they need keys).
 
 ### rates.yaml
 
@@ -74,8 +95,6 @@ tasks: # optional; first keyword match wins
   - { match: [blog], hours: 6, label: Blog setup }
   - { match: [translation, spanish], fixed: 450, label: Translation }
 ```
-
-### Tone
 
 `--tone friendly|neutral|firm` changes the wording of the drafts.
 
@@ -94,13 +113,14 @@ Everything runs locally by default: files are read from disk, the local model ru
 
 ## Limits
 
-- **LLM judgement is a draft. You decide.** Models misread context, and small local ones are over-confident. Read every row before you say anything to a client.
+- **LLM judgement is a draft. You decide.** Models misread context, and small local ones are over-confident and guess hours badly (see the sample). Read every row before you say anything to a client.
 - Not legal advice. A change-order draft is a polite message, not a contract term. Check your actual agreement.
-- The rule layer is lexical. It can miss a paraphrased exclusion and can over-match a shared word; revision-round counting uses a 30-minute heuristic and cannot know which deliverable a round belongs to.
-- The heuristic extractor can split one ask into two and can miss requests with no cue words. It also treats whoever is not `--client` / `--me` as the client only if it can tell; with no flag it guesses from names in the SOW, or analyses everyone and warns.
+- The rule layer is lexical and deliberately narrow. It can miss a paraphrased exclusion and, rarely, over-match one. Revision-round counting uses a 30-minute heuristic and cannot know which deliverable a round belongs to; revision wording ("change", "move", "bigger") is a keyword list.
+- A request the SOW is silent on is UNCLEAR unless the model cites a clause. The tool will not call something OUT-OF-SCOPE without a clause to point at.
+- The extractor can miss requests with no cue words, and consolidation can merge two genuinely separate asks that share a topic. It treats everyone who is not `--client` / `--me` as the client only if it can tell; with no flag it guesses from names in the SOW, or analyses everyone and warns.
 - Chat context across messages ("yes, do that") is not resolved. Attachments and images are ignored.
-- PDF text extraction depends on the PDF having a text layer. Scanned SOWs need OCR first.
-- Estimates multiply your rate by hours that a model guessed. Edit them.
+- PDF text extraction needs a text layer. Scanned SOWs need OCR first.
+- The eval set is 42 items written by the author. The accuracy table is a regression check, not evidence it will hold on your SOWs.
 - The Groq and Gemini backends are untested against the live APIs.
 
 ## For you if
@@ -118,7 +138,7 @@ pip install ".[dev]"
 python -m pytest
 ```
 
-59 tests: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter, revision counter, evidence rule, mock-LLM classification, change-order math, HTML and CSV escaping, never-send, redaction, server bind guard and auth.
+66 tests: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter, revision counter and allowance, phrase-level exclusions, consolidation, evidence rule, mock-LLM classification, change-order math and ranges, HTML and CSV escaping, never-send, redaction, server bind guard and auth, and the eval set (rules-only must get every revision case right).
 
 ## Need this wired into your business?
 
