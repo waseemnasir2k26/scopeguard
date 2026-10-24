@@ -4,7 +4,9 @@
 
 Hi Dana,
 
-Thanks for this, and happy to help. You asked: "Can you write the text for the Services page?"
+Thanks for this, and happy to help. Just checking: is this something you'd like added? If so, here's what it would cost.
+
+You asked: "Can you write the text for the Services page?"
 
 This one sits outside what we agreed in the project scope, so I'd like to handle it as a small add-on. That keeps the original timeline and budget safe. The closest part of the agreed scope is: C13 (SOW 3.2).
 

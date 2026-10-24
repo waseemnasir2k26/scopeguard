@@ -290,6 +290,78 @@
    "text": "Could you add a testimonials page as well?",
    "expect": "OUT-OF-SCOPE",
    "tag": "page"
+  },
+  {
+   "id": "L47",
+   "text": "Actually please don't add an online shop, I changed my mind.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L48",
+   "text": "Do you also do blog writing? Just curious, we don't need one.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L49",
+   "text": "Please use the photos I sent for the gallery.",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L50",
+   "text": "I will send the logo files and photographs tomorrow, can you place them in the header?",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L51",
+   "text": "Could you add alt text to the gallery images and use the photos I sent?",
+   "expect": "IN-SCOPE",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L52",
+   "text": "No need for a booking calendar after all.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L53",
+   "text": "Never mind about the newsletter, cancel that.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L54",
+   "text": "We are thinking about a blog maybe later.",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L55",
+   "text": "How much would a Spanish version cost?",
+   "expect": "UNCLEAR",
+   "tag": "adversarial"
+  },
+  {
+   "id": "L56",
+   "text": "Could the contact form send enquiries to two email addresses?",
+   "expect": "OUT-OF-SCOPE",
+   "tag": "numeric"
+  },
+  {
+   "id": "L57",
+   "text": "Can the contact form email one address?",
+   "expect": "IN-SCOPE",
+   "tag": "numeric"
+  },
+  {
+   "id": "L58",
+   "text": "Could the gallery show 24 photos?",
+   "expect": "IN-SCOPE",
+   "tag": "numeric"
   }
  ]
 }

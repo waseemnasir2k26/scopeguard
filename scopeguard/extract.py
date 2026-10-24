@@ -2,28 +2,50 @@
 
 Heuristics first (always on). An LLM pass is optional; anything an LLM proposes must
 quote the messages verbatim, otherwise it is dropped (the evidence rule).
+
+Each candidate also gets an *act*: a real request, or a retraction ("changed my mind") or a
+hypothetical / price question ("just curious"). Only real requests can ever be billed.
 """
 from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from typing import Iterable, Optional
 
 from .models import Message, Request
-from .textutil import normalize
+from .textutil import concepts, normalize
 
+_IMPERATIVE = (r"^(?:(?:also|and|then|plus|so|ok|okay|sorry|actually)[,!.]?\s+)*(?:please\s+)?"
+               r"(?:add|make|change|move|swap|fix|update|install|create|build|set ?up|connect|put|use|place|"
+               r"include|send|write|translate|remove|replace|adjust|tweak|rename|resize|redo|try|show|embed|link|"
+               r"design|shoot|publish|upload|integrate|schedule|post)\b")
 _CUES = re.compile(
-    r"\b(can|could|would|will) (you|we|u|the|this|that|it|our|my|there)\b|\bplease\b|\bpls\b|\bwe (need|want|would like|'d like|should)\b|"
-    r"\bi (need|want|would like|'d like|wanna)\b|\bi'?d like\b|\b(also|additionally|one more thing|by the way|btw|"
-    r"while you'?re at it|on top of that)\b|\bit would be (nice|great|good|helpful)\b|\bcan we\b|\bwhat about\b|"
-    r"\bhow about\b|\blet'?s (add|have|do|try)\b|\badd(ing)?\b|\bmake (it|the|sure|them|this)\b|\bchange\b|"
-    r"\bneed(s)?\b|\bwant(s)?\b|\binclude\b|\bupdate\b|\binstead\b|\bswap\b|\breplace\b|\bmove\b|\bshould\b|"
-    r"\bwould love\b|\bwish\b|\btry\b", re.I)
+    r"\b(can|could|would|will) (you|we|u|the|this|that|it|our|my|there)\b|\bplease\b|\bpls\b|"
+    r"\bwe (need|want|would like|'d like)\b|\bi (need|want|would like|'d like|wanna)\b|\bi'?d like\b|"
+    r"\b(also|additionally|one more thing|by the way|btw|while you'?re at it|on top of that)\b|"
+    r"\bit would be (nice|great|good|helpful)\b|\bwhat about\b|\bhow about\b|\blet'?s (add|have|do|try)\b|"
+    r"\bmake (it|the|sure|them|this)\b|\bchange\b|\bneeds?\b|\bwants?\b|\bswap\b|\breplace\b|\bmove\b|"
+    r"\bwould love\b|" + _IMPERATIVE.replace("^", r"(?:^|[.!?]\s+)"), re.I)
 _SKIP = re.compile(
     r"^(thanks|thank you|thx|ok(ay)?|great|perfect|nice|cool|sounds good|looks (great|good)|love it|got it|"
     r"yes|yep|no problem|hi|hello|hey|good (morning|evening)|will do)\b[^?]*$", re.I)
 _STATUS = re.compile(r"\b(when will|any update|how long|what'?s the (status|eta)|did you (get|receive|see)|are you (there|free|available))\b", re.I)
 _ADMIN = re.compile(r"\b(invoice|invoices|receipt|bank details|payment schedule)\b", re.I)   # billing admin, not scope
+
+_RETRACT = re.compile(
+    r"\b(?:don'?t|do not|dont)\s+(?:add|need|want|include|build|make|do|bother|worry)\b|\bno need\b|\bnever ?mind\b|"
+    r"\bchang(?:ed|ing) (?:my|our) minds?\b|\bcancel (?:that|this|it)\b|\bscrap (?:that|this|it)\b|"
+    r"\bforget (?:it|that|about)\b|\bignore (?:that|my|the last)\b|\bnot needed\b|\bwe don'?t need\b|"
+    r"\bno longer (?:need|want)\b|\bnot after all\b|\bwithdraw\b|\bleave (?:it|that) out\b", re.I)
+_HYPO = re.compile(
+    r"\bjust curious\b|\bout of curiosity\b|\bmaybe (?:later|someday|one day|in (?:the )?future)\b|"
+    r"\bthinking (?:about|of)\b|\bwondering (?:if|whether|how)\b|\bin the future\b|\bsome ?day\b|\bone day\b|"
+    r"\bat some point\b|\bfor later\b|\bhow much (?:would|does|do|is|will)\b|\bwhat would (?:it|that|this) cost\b|"
+    r"\bwhat'?s the (?:price|cost|rate)\b|\b(?:do|does) (?:you|your team)(?: also| guys)? "
+    r"(?:do|offer|have|provide|handle|build|make|sell)\b|\bare you (?:able|capable)\b|\bif (?:we|i) (?:ever|wanted|decide)\b|"
+    r"\bwe might\b", re.I)
+
 _REV_CUE = re.compile(
     r"\b(change|changing|tweak|adjust|revise|modify|redo|rework|swap|replace|recolou?r|rename|reposition|resize|"
     r"move|bigger|smaller|larger|darker|lighter|brighter|font|colou?r|instead of|different (colou?r|font|image|photo|layout|"
@@ -34,6 +56,16 @@ _NEW_CUE = re.compile(
     r"also (want|need)|plus)\b", re.I)
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
+_WORD = re.compile(r"\w+")
+
+
+def classify_act(text: str) -> str:
+    """request | retracted | hypothetical. Doubt is not a request."""
+    if _RETRACT.search(text):
+        return "retracted"
+    if _HYPO.search(text):
+        return "hypothetical"
+    return "request"
 
 
 def is_revision(text: str) -> bool:
@@ -53,24 +85,69 @@ def heuristic_requests(messages: Iterable[Message]) -> list[Request]:
     out: list[Request] = []
     for m in messages:
         for sent in split_sentences(m.text):
-            if len(sent.split()) < 4 or _SKIP.match(sent) or _STATUS.search(sent) or _ADMIN.search(sent):
+            act = classify_act(sent)
+            if _SKIP.match(sent) or _STATUS.search(sent) or _ADMIN.search(sent):
                 continue
-            if not _CUES.search(sent):
+            if len(sent.split()) < 4:
+                continue
+            # a retraction or a hypothetical is kept (as UNCLEAR, never billed) even without a request cue
+            if act == "request" and not _CUES.search(sent):
                 continue
             out.append(Request(id="", message_id=m.id, sender=m.sender, ts=m.ts, quote=sent,
-                               is_revision=is_revision(sent)))
+                               is_revision=is_revision(sent) and act == "request", act=act))
     return out
 
 
-def find_evidence(quote: str, messages: Iterable[Message]) -> Optional[Message]:
-    """Evidence rule: the quote must appear verbatim (modulo case/whitespace/quote style)."""
-    nq = normalize(quote)
-    if len(nq) < 8:
+# ---------------------------------------------------------------- evidence rule (indexed)
+class EvidenceIndex:
+    """Evidence rule: a quote must appear verbatim (modulo case/whitespace/quote style).
+
+    Built once per run: an inverted index word -> messages. A lookup intersects the posting lists of
+    the quote's interior words (each is a whole word in any true match) and only then does the
+    substring check, so 50k messages cost milliseconds per quote, not a full rescan."""
+
+    def __init__(self, messages: Iterable[Message]):
+        self.msgs = list(messages)
+        self.norm = [normalize(m.text) for m in self.msgs]
+        self.index: dict[str, list[int]] = {}
+        self._cache: dict[str, Optional[int]] = {}
+        for i, t in enumerate(self.norm):
+            for w in set(_WORD.findall(t)):
+                self.index.setdefault(w, []).append(i)
+
+    def find(self, quote: str) -> Optional[Message]:
+        nq = normalize(quote)
+        if len(nq) < 8:
+            return None
+        if nq in self._cache:
+            i = self._cache[nq]
+            return None if i is None else self.msgs[i]
+        i = self._lookup(nq)
+        self._cache[nq] = i
+        return None if i is None else self.msgs[i]
+
+    def _lookup(self, nq: str) -> Optional[int]:
+        words = _WORD.findall(nq)
+        interior = set(words[1:-1])
+        if interior:
+            best = None
+            for w in interior:
+                p = self.index.get(w)
+                if p is None:
+                    return None            # a whole word of the quote is in no message at all
+                if best is None or len(p) < len(best):
+                    best = p
+            order = best                   # scan only the rarest word's messages
+        else:
+            order = range(len(self.msgs))
+        for i in order:
+            if nq in self.norm[i]:
+                return i
         return None
-    for m in messages:
-        if nq in normalize(m.text):
-            return m
-    return None
+
+
+def find_evidence(quote: str, messages: Iterable[Message]) -> Optional[Message]:
+    return EvidenceIndex(messages).find(quote)
 
 
 EXTRACT_SYSTEM = (
@@ -114,8 +191,9 @@ def llm_requests(llm, messages: list[Message], redact_fn=lambda s: s, batch: int
             quote = it["quote"].strip()
             if redact_fn(msg.text) != msg.text:   # recover the un-redacted wording for the report
                 quote = _original_span(quote, msg.text, redact_fn) or quote
+            act = classify_act(quote)
             out.append(Request(id="", message_id=msg.id, sender=msg.sender, ts=msg.ts, quote=quote,
-                               is_revision=is_revision(quote)))
+                               is_revision=is_revision(quote) and act == "request", act=act))
     return out, dropped
 
 
@@ -129,24 +207,21 @@ def merge_requests(primary: list[Request], extra: list[Request]) -> list[Request
     return merged
 
 
-# ---------------------------------------------------------------- consolidation
+# ---------------------------------------------------------------- consolidation (after classification)
 _ANAPHOR = re.compile(r"\b(it|that|this|them|those|these)\b", re.I)
 WINDOW_DAYS = 7
 WINDOW_MESSAGES = 8
 
 
 def _toks(r: Request) -> set:
-    from .textutil import concepts
     return set(concepts(r.quote))
 
 
 def _same_intent(a: Request, b: Request, order: dict) -> bool:
     """a is an earlier consolidated item, b a later request from the same sender."""
-    from datetime import datetime
     if a.sender != b.sender:
         return False
-    # window: seven days when both have timestamps, else eight messages
-    if a.ts and b.ts:
+    if a.ts and b.ts:   # seven days when both have timestamps, else eight messages
         try:
             if abs((datetime.fromisoformat(b.ts) - datetime.fromisoformat(a.ts)).total_seconds()) > WINDOW_DAYS * 86400:
                 return False
@@ -154,10 +229,9 @@ def _same_intent(a: Request, b: Request, order: dict) -> bool:
             pass
     elif abs(order.get(b.message_id, 0) - order.get(a.message_ids[-1] if a.message_ids else a.message_id, 0)) > WINDOW_MESSAGES:
         return False
-    # split request: a short follow-up sentence that refers back ("set it up and write the first posts")
-    same_msg = a.message_id == b.message_id or a.message_ids and a.message_ids[-1] == b.message_id
+    same_msg = a.message_id == b.message_id or (a.message_ids and a.message_ids[-1] == b.message_id)
     if same_msg and len(b.quote.split()) <= 16 and _ANAPHOR.search(b.quote) and not b.is_revision:
-        return True
+        return True   # a short follow-up that refers back ("set it up and write the first posts")
     ta, tb = _toks(a), _toks(b)
     if not ta or not tb:
         return False
@@ -168,21 +242,32 @@ def _same_intent(a: Request, b: Request, order: dict) -> bool:
     return jac >= 0.5 or bool(strong)
 
 
-def consolidate(requests: list, messages: list) -> list:
-    """Merge split and near-duplicate requests (same intent, same sender, inside a window) into one
-    item carrying several quotes, so each real ask is classified and priced once."""
+def consolidate_findings(findings: list, messages: list, sow) -> list:
+    """Merge split and near-duplicate requests into one item carrying several quotes, so each real
+    ask is priced once. Only items with the SAME verdict and the same cited-clause kind are merged;
+    an IN and an OUT item are never combined, and retractions/hypotheticals never merge."""
     order = {m.id: i for i, m in enumerate(messages)}
+
+    def kind(f):
+        c = sow.by_id(f.clause_id) if f.clause_id else None
+        return c.kind if c else None
+
     kept: list = []
-    for r in requests:
+    for f in findings:
         target = None
-        for k in reversed(kept[-WINDOW_MESSAGES:]):
-            if _same_intent(k, r, order):
-                target = k
-                break
+        if f.request.act == "request":
+            for k in reversed(kept[-WINDOW_MESSAGES:]):
+                if (k.request.act == "request" and k.cls == f.cls and kind(k) == kind(f)
+                        and _same_intent(k.request, f.request, order)):
+                    target = k
+                    break
         if target is None:
-            r.message_ids = [r.message_id]
-            kept.append(r)
+            f.request.message_ids = [f.request.message_id]
+            kept.append(f)
         else:
-            target.extra_quotes.append(r.quote)
-            target.message_ids.append(r.message_id)
+            target.request.extra_quotes.append(f.request.quote)
+            target.request.message_ids.append(f.request.message_id)
+            target.notes.append("Merged a split or duplicate request into this item.")
+    for i, f in enumerate(kept, 1):
+        f.id = f"REQ-{i:02d}"
     return kept

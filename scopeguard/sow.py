@@ -67,6 +67,25 @@ _EXCL_TEXT = re.compile(
 _REV_TEXT = re.compile(r"\brounds?\s+of\s+(?:\w+\s+)?(?:revisions?|changes|edits|feedback)|\brevisions?\b|\brevision rounds?\b", re.I)
 _TIME_TEXT = re.compile(r"\b(week|weeks|days?|deadline|milestone|launch date|kick-?off|within \d+|business days?)\b", re.I)
 
+_UNITS = {"photo": "image", "photos": "image", "image": "image", "images": "image", "picture": "image",
+          "pictures": "image", "email": "email", "emails": "email", "address": "email", "addresses": "email",
+          "recipient": "email", "recipients": "email", "form": "form", "forms": "form", "language": "language",
+          "languages": "language", "video": "video", "videos": "video", "post": "post", "posts": "post",
+          "product": "product", "products": "product", "user": "user", "users": "user", "login": "user",
+          "logins": "user", "page": "page", "pages": "page", "revision": "revision", "revisions": "revision",
+          "round": "revision", "rounds": "revision", "section": "section", "sections": "section",
+          "slide": "slide", "slides": "slide"}
+_NUMW = r"\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|fifty"
+_CAP = re.compile(r"\b(?P<n>" + _NUMW + r")\s+(?:(?:email|client-supplied|additional|extra|new)\s+)?"
+                  r"(?P<unit>[A-Za-z]+)\b", re.I)
+_SUPPLY = re.compile(r"\b(?:the\s+)?(?:client|customer)\s+(?:will\s+)?(?:supplies|supply|provides|provide|sends|send)\s+"
+                     r"(?P<what>[^.;]+)", re.I)
+
+
+def canonical_unit(word: str):
+    return _UNITS.get(word.lower())
+
+
 _PAGES = re.compile(r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)[- ]pages?\b", re.I)
 _REV_LIMIT = re.compile(
     r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:\(\d+\)\s*)?"
@@ -163,6 +182,19 @@ def parse_sow(text: str) -> Sow:
                 if n:
                     sow.revision_limit, sow.revision_clause = n, c.id
                     break
+    for c in clauses:
+        for m in _CAP.finditer(c.text):
+            tok = m.group("n").lower()
+            n = int(tok) if tok.isdigit() else NUMBER_WORDS.get(tok)
+            unit = canonical_unit(m.group("unit"))
+            if n and unit and unit not in ("page", "revision"):
+                sow.caps.append({"unit": unit, "n": n, "clause": c.id})
+        m = _SUPPLY.search(c.text)
+        if m and not sow.client_clause:
+            from .textutil import concepts
+            what = re.split(r"\b(?:before|by|prior|once|when|after)\b", m.group("what"))[0]
+            sow.client_supplied = sorted(k for k in concepts(what))
+            sow.client_clause = c.id
     for c in clauses:
         if c.kind != "deliverable":
             continue

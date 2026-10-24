@@ -9,14 +9,17 @@ from typing import Callable, Optional
 
 from .changeorder import estimate
 from .classify import classify_all
-from .extract import consolidate, find_evidence, heuristic_requests, llm_requests, merge_requests
+from .extract import EvidenceIndex, consolidate_findings, heuristic_requests, llm_requests, merge_requests
 from .messages import load_messages
 from .models import OUT_OF_SCOPE, Finding, Message, Sow
 from .rates import RateCard
 from .redact import redact
-from .rules import assign_revision_rounds
+from .rules import assign_revision_rounds, rounds_log
 from .sow import load_sow, parse_sow
 from .textutil import normalize
+
+
+MAX_MESSAGES = 200_000
 
 
 @dataclass
@@ -80,6 +83,9 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
         for i, m in enumerate(messages, 1):
             if not m.id:
                 m.id = f"M{i}"
+    if len(messages) > MAX_MESSAGES:
+        raise ValueError(f"The input has {len(messages):,} messages; the limit is {MAX_MESSAGES:,} per run. "
+                         "Split the export (for example by month) and run each part.")
     warnings: list[str] = []
     if not sow.clauses:
         warnings.append("No clauses were found in the SOW; every request will be UNCLEAR or OUT-OF-SCOPE.")
@@ -97,30 +103,35 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
         if dropped:
             warnings.append(f"Evidence rule dropped {dropped} LLM-extracted request(s) whose quote was not found verbatim.")
     # evidence rule applies to everything that reaches the report
+    index = EvidenceIndex(client_msgs)             # built once; lookups do not rescan every message
     kept = []
     for r in requests:
-        if find_evidence(r.quote, client_msgs) is None:
+        if index.find(r.quote) is None:
             dropped += 1
-            continue
-        kept.append(r)
-    n_before = len(kept)
-    requests = consolidate(kept, client_msgs)      # split / duplicate asks become one item
+        else:
+            kept.append(r)
+    requests = kept
     for i, r in enumerate(requests, 1):
         r.id = f"Q{i}"
     assign_revision_rounds(requests)
+    log = rounds_log(requests)
 
     if opts.llm is None:
         raise ValueError("Options.llm is required")
-    findings = classify_all(requests, sow, opts.llm, redact_fn, opts.min_confidence, opts.progress)
+    raw = classify_all(requests, sow, opts.llm, redact_fn, opts.min_confidence, opts.progress)
+    findings = consolidate_findings(raw, client_msgs, sow)    # same verdict + same clause kind only
+    n_before = len(raw)
     for f in findings:
+        if f.rule == "revision_limit":
+            f.round_log = log
         if f.cls == OUT_OF_SCOPE:
             f.estimate = estimate(f.request.quote, (f.estimate or {}).get("llm_hours"), opts.rates,
-                                   use_tasks=f.rule != "revision_limit")
+                                  use_tasks=f.rule != "revision_limit")
         else:
             f.estimate = None
     meta = {"currency": opts.rates.currency, "llm": opts.llm.label(), "cloud": bool(getattr(opts.llm, "is_cloud", False)), "redacted": opts.redact,
             "seconds": round(time.time() - t0, 1), "messages": len(messages), "client_messages": len(client_msgs),
-            "requests": len(requests), "merged_duplicates": n_before - len(requests), "dropped_by_evidence_rule": dropped, "tone": opts.tone,
+            "requests": len(findings), "merged_duplicates": n_before - len(findings), "dropped_by_evidence_rule": dropped, "tone": opts.tone,
             "revision_limit": sow.revision_limit,
             "revision_rounds_used": max((r.revision_round for r in requests), default=0)}
     return Result(sow=sow, messages=messages, client_messages=client_msgs, findings=findings,

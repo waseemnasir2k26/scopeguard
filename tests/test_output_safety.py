@@ -90,7 +90,8 @@ def test_draft_content_and_tones():
 
 def test_draft_revision_limit_wording_and_no_clause():
     f = _finding(rule="revision_limit")
-    assert "2 revision round(s)" in draft(f, RateCard(), "neutral", 2)
+    d = draft(f, RateCard(), "neutral", 2)
+    assert "agreement includes 2" in d and "Correct me if I've miscounted" in d
     f.clause_id = None
     assert "couldn't find anything in the agreed scope" in draft(f, RateCard(), "friendly")
 
@@ -229,10 +230,14 @@ def test_server_requires_token_and_validates_body(server):
         raise AssertionError("oversize body was accepted")
     except urllib.error.HTTPError as e:      # 413, or the server may drop the connection mid-upload
         assert e.code == 413
-    except (ConnectionError, urllib.error.URLError):
+    except (OSError, urllib.error.URLError):
         pass
-    with urllib.request.urlopen(server + "/healthz") as r:
-        assert json.loads(r.read())["ok"] is True
+    with pytest.raises(urllib.error.HTTPError) as ei:                 # /healthz needs the token too
+        urllib.request.urlopen(server + "/healthz")
+    assert ei.value.code == 401
+    hz = urllib.request.Request(server + "/healthz", headers={"Authorization": "Bearer tok"})
+    with urllib.request.urlopen(hz) as r:
+        assert json.loads(r.read()) == {"ok": True}                   # minimal: no model name, no SOW details
     with pytest.raises(urllib.error.HTTPError) as ei:
         urllib.request.urlopen(server + "/nope")
     assert ei.value.code == 404

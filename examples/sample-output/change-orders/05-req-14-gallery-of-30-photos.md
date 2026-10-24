@@ -4,7 +4,9 @@
 
 Hi Dana,
 
-Thanks for this, and happy to help. You asked: "Can the gallery show 30 photos?"
+Thanks for this, and happy to help. Just checking: is this something you'd like added? If so, here's what it would cost.
+
+You asked: "Can the gallery show 30 photos?"
 
 This one sits outside what we agreed in the project scope, so I'd like to handle it as a small add-on. That keeps the original timeline and budget safe. The closest part of the agreed scope is: C2 (SOW 1.2).
 
@@ -16,4 +18,4 @@ Best,
 [Your name]
 
 ---
-_Basis: LLM-proposed hours x hourly rate. Classified OUT-OF-SCOPE with confidence 0.99. Reason: Clause C2 explicitly limits the Portfolio page gallery to 'up to 24 client-supplied images', and the request for 30 photos exceeds this limit, making it out of scope._
+_Basis: LLM-proposed hours x hourly rate. Classified OUT-OF-SCOPE with confidence 0.85. Reason: The request asks for 30 image(s); C2 (SOW 1.2) caps this at 24._

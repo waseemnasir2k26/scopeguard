@@ -18,7 +18,7 @@ from .sow import load_text, parse_sow
 def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--sow", required=True, help="agreed scope: .md, .txt, .pdf or .docx")
     p.add_argument("--rates", help="rates.yaml (hourly rate, currency, per-task estimates)")
-    p.add_argument("--llm", default="auto", help="auto (local Ollama), ollama, groq, gemini or mock (default auto)")
+    p.add_argument("--llm", default="auto", help="auto (local Ollama), ollama, groq, gemini, mock (offline demo) or none (rules only)")
     p.add_argument("--model", help="override the model name for the chosen backend")
     p.add_argument("--allow-cloud", action="store_true", help="let --llm auto fall back to Groq/Gemini (sends text off this machine)")
     p.add_argument("--client", action="append", default=[], help="client's sender name (repeatable)")
@@ -79,7 +79,7 @@ def cmd_serve(args) -> int:
     token = args.token or os.environ.get("SCOPEGUARD_TOKEN")
     opts, sow, sow_text = _build(args)
     try:
-        srv = make_server(args.host, args.port, sow, sow_text, opts, token)
+        srv = make_server(args.host, args.port, sow, sow_text, opts, token, tuple(args.allowed_host))
     except BindError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -149,6 +149,7 @@ def main(argv=None) -> int:
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--token", help="required for non-loopback hosts (or set SCOPEGUARD_TOKEN)")
+    s.add_argument("--allowed-host", action="append", default=[], help="extra Host header value to accept (repeatable)")
     s.set_defaults(fn=cmd_serve)
 
     e = sub.add_parser("eval", help="measure accuracy on a labelled request set (see examples/eval/labels.json)")

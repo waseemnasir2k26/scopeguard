@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from html import escape
 
-from .changeorder import headline, money
+from .changeorder import draftable, headline, money
 from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .rates import RateCard
 
@@ -87,6 +87,8 @@ def render_html(res, card: RateCard) -> str:
             parts.append(f"<dt>Estimate</dt><dd>{_e(calc)} <span class=meta>(estimate; basis: {_e(e['basis'])})</span></dd>")
         if f.draft_file:
             parts.append(f"<dt>Draft</dt><dd><code>{_e(f.draft_file)}</code> (never sent)</dd>")
+        elif f.cls == OUT_OF_SCOPE and not draftable(f):
+            parts.append("<dt>Draft</dt><dd>none: needs a cited clause and confidence of at least 0.75</dd>")
         parts.append("</dl>")
         if f.notes:
             parts.append("<details><summary>Notes</summary><ul>" + "".join(f"<li>{_e(n)}</li>" for n in f.notes) + "</ul></details>")

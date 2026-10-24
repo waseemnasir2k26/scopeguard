@@ -182,31 +182,55 @@ def test_heuristic_extraction_skips_chatter():
 
 
 # ---------------------------------------------------------------- consolidation / phrases / headline / eval
+def _classified(msgs, sow=None, llm=None):
+    from scopeguard.extract import consolidate_findings
+    sow = sow or SOW
+    for i, m in enumerate(msgs, 1):
+        m.id = m.id or f"M{i}"
+    reqs = heuristic_requests(msgs)
+    for i, r in enumerate(reqs, 1):
+        r.id = f"Q{i}"
+    assign_revision_rounds(reqs)
+    raw = classify_all(reqs, sow, llm or MockLLM())
+    return raw, consolidate_findings(raw, msgs, sow)
+
+
 def test_split_request_is_consolidated_into_one_item():
-    from scopeguard.extract import consolidate
     msg = Message(id="M1", sender="Dana", text="Could we also have a blog? I'd like you to set it up and write the first three posts.",
                   ts="2026-03-01T10:00:00")
-    reqs = heuristic_requests([msg])
-    assert len(reqs) == 2
-    [one] = consolidate(reqs, [msg])
-    assert one.quote == "Could we also have a blog?" and len(one.extra_quotes) == 1
-    assert "write the first three posts" in one.text()
+    raw, [one] = _classified([msg])
+    assert len(raw) == 2
+    assert one.request.quote == "Could we also have a blog?" and len(one.request.extra_quotes) == 1
+    assert "write the first three posts" in one.request.text() and one.id == "REQ-01"
 
 
 def test_duplicate_across_messages_within_window_but_not_beyond():
-    from scopeguard.extract import consolidate
     msgs = [Message(id="M1", sender="Dana", text="Can we add an online shop for prints?", ts="2026-03-01T10:00:00"),
             Message(id="M2", sender="Dana", text="Any news on the online shop idea? Please add the shop soon.", ts="2026-03-03T10:00:00"),
             Message(id="M3", sender="Dana", text="Please add the online shop now.", ts="2026-04-20T10:00:00")]
-    items = consolidate(heuristic_requests(msgs), msgs)
-    assert len(items) == 2 and len(items[0].extra_quotes) >= 1       # M3 is 7+ days later: separate item
+    _, items = _classified(msgs)
+    assert len(items) == 2 and len(items[0].request.extra_quotes) >= 1       # M3 is 7+ days later: separate item
 
 
 def test_different_requests_and_revisions_are_not_merged():
-    from scopeguard.extract import consolidate
     msgs = [Message(id="M1", sender="Dana", text="Can you make the logo bigger? Also please make the footer colour match the logo.",
                     ts="2026-03-01T10:00:00")]
-    assert len(consolidate(heuristic_requests(msgs), msgs)) == 2
+    assert len(_classified(msgs)[1]) == 2
+
+
+def test_consolidation_never_merges_different_verdicts():
+    msgs = [Message(id="M1", sender="Dana", text="Please install Google Analytics for the gallery.", ts="2026-03-01T10:00:00"),
+            Message(id="M2", sender="Dana", text="Please add an online shop for the gallery.", ts="2026-03-01T10:05:00")]
+    verdict = {"Analytics": ("IN-SCOPE", "C2"), "shop": ("OUT-OF-SCOPE", "C4")}
+
+    def fn(system, user):
+        quote = json.loads(user.split("REQUEST_JSON:", 1)[1])["quote"]
+        key = "Analytics" if "Analytics" in quote else "shop"
+        c, cid = verdict[key]
+        return json.dumps({"class": c, "clause_id": cid, "confidence": 0.9, "reason": "r", "estimated_hours": 2, "title": "t"})
+    raw, items = _classified(msgs, llm=FakeLLM(fn=fn))
+    assert {f.cls for f in raw} == {IN_SCOPE, OUT_OF_SCOPE}
+    assert len(items) == 2 and all(not f.request.extra_quotes for f in items)
 
 
 def test_exclusion_needs_a_phrase_not_one_word():

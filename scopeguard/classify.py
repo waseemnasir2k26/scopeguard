@@ -88,10 +88,18 @@ def _ask(req: Request, sow: Sow, llm, redact_fn, min_confidence: float) -> dict:
                 "hours": None, "title": "", "notes": ["llm error"]}
 
 
+def short_title(quote: str, limit: int = 60) -> str:
+    """A readable title that never cuts a quotation in half."""
+    t = " ".join(quote.replace('"', "").replace("“", "").replace("”", "").split()).rstrip("?.! ")
+    if len(t) <= limit:
+        return t
+    return t[:limit].rsplit(" ", 1)[0].rstrip(",;:- ") + "..."
+
+
 def classify_one(req: Request, idx: int, sow: Sow, llm, redact_fn, min_confidence: float,
                  state: Optional[dict] = None) -> Finding:
     f = Finding(id=f"REQ-{idx:02d}", request=req, cls=UNCLEAR, confidence=0.0)
-    default_title = " ".join(req.quote.rstrip("?.! ").split()[:8])
+    default_title = short_title(req.quote)
     rule = precheck(req, sow, state)                # 1. deterministic layer, final
     if rule is not None:
         clause = rule["clause"]

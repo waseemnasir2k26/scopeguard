@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 
-from .changeorder import draft, headline, money
+from .changeorder import draft, draftable, headline, money
 from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .pipeline import Result
 from .rates import RateCard
@@ -84,7 +84,7 @@ def write_all(res: Result, out_dir: str | Path, card: RateCard, tone: str = "fri
     co_dir.mkdir(parents=True, exist_ok=True)
     for old in co_dir.glob("*.md"):   # keep the folder in sync with this run
         old.unlink()
-    for i, f in enumerate([x for x in res.findings if x.cls == OUT_OF_SCOPE], 1):
+    for i, f in enumerate([x for x in res.findings if draftable(x)], 1):
         name = f"{i:02d}-{f.id.lower()}-{slug(f.title)}.md"
         (co_dir / name).write_text(draft(f, card, tone, res.sow.revision_limit), encoding="utf-8")
         f.draft_file = f"change-orders/{name}"

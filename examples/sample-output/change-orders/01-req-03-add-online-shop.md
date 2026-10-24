@@ -1,10 +1,12 @@
 > DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.
 
-**Subject:** Quick scope check: Add online shop to website
+**Subject:** Quick scope check: Add Online Shop
 
 Hi Dana,
 
-Thanks for this, and happy to help. You asked: "One more thing, can we add an online shop so people can buy our prints?"
+Thanks for this, and happy to help. Just checking: is this something you'd like added? If so, here's what it would cost.
+
+You asked: "One more thing, can we add an online shop so people can buy our prints?"
 
 This one sits outside what we agreed in the project scope, so I'd like to handle it as a small add-on. That keeps the original timeline and budget safe. The closest part of the agreed scope is: C12 (SOW 3.1).
 

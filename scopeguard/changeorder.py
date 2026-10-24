@@ -10,6 +10,7 @@ from .rates import RateCard
 from .textutil import concepts
 
 SYMBOLS = {"USD": "$", "EUR": "EUR ", "GBP": "GBP ", "AUD": "A$", "CAD": "C$"}
+MIN_DRAFT_CONFIDENCE = 0.75
 
 
 def money(amount: float, currency: str) -> str:
@@ -19,6 +20,13 @@ def money(amount: float, currency: str) -> str:
 
 def _round_up_quarter(h: float) -> float:
     return math.ceil(h * 4 - 1e-9) / 4
+
+
+def draftable(f: Finding) -> bool:
+    """A change-order draft exists only for a real request that is OUT-OF-SCOPE, cites a clause,
+    and was decided with confidence of at least 0.75. Doubt is never billed."""
+    return (f.cls == "OUT-OF-SCOPE" and bool(f.clause_id) and f.confidence >= MIN_DRAFT_CONFIDENCE
+            and f.request.act == "request" and f.estimate is not None)
 
 
 def estimate(quote: str, llm_hours: Optional[float], card: RateCard, use_tasks: bool = True) -> dict:
@@ -47,28 +55,45 @@ def estimate(quote: str, llm_hours: Optional[float], card: RateCard, use_tasks: 
                 amount_low=round(lo * rate, 2), amount_high=round(hi * rate, 2), basis=basis)
 
 
+_MD_SPECIAL = re.compile(r"([\\`*_{}\[\]<>#|~!])")
+
+
+def md_escape(text: str) -> str:
+    """Escape Markdown (and HTML) metacharacters so a client's words cannot inject formatting or links."""
+    text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text or "")
+    return _MD_SPECIAL.sub(lambda m: chr(92) + m.group(1), text)
+
+
+def one_line(text: str, limit: int = 120) -> str:
+    """Strip newlines and control characters (for an email subject line)."""
+    t = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", text or "").split())
+    return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "..."
+
+
 def _first_name(sender: str) -> str:
-    s = sender.strip()
+    s = re.sub(r"[^\w .'-]", "", sender.strip())
     return s.split()[0] if s and s.lower() not in {"client", "unknown"} else "there"
 
+
+_SOFT = "Just checking: is this something you'd like added? If so, here's what it would cost."
 
 _TONES = {
     "friendly": {
         "open": "Thanks for this, and happy to help.",
         "mid": "This one sits outside what we agreed in the project scope, so I'd like to handle it as a small add-on. That keeps the original timeline and budget safe.",
-        "rev": "We've now used the {n} revision round(s) included in the agreement, so I'd like to treat further changes as a small add-on.",
+        "rev": "By my count this is revision round {n}, and the agreement includes {limit}, so I'd like to treat further changes as a small add-on.",
         "close": "If that works for you, just reply \"approved\" and I'll slot it in. Happy to talk it through if you'd like.",
     },
     "neutral": {
         "open": "Thank you for the request.",
         "mid": "This is not covered by the agreed scope, so I'm proposing it as a change order.",
-        "rev": "The {n} revision round(s) in the agreement have been used, so further changes would be a change order.",
+        "rev": "By my count this is revision round {n} and the agreement includes {limit}, so further changes would be a change order.",
         "close": "Please confirm if you'd like to proceed and I will schedule the work.",
     },
     "firm": {
         "open": "Thank you for your message.",
-        "mid": "This request falls outside the agreed scope and will be handled as a billable change order.",
-        "rev": "The {n} revision round(s) in the agreement have been used. Further changes are billable.",
+        "mid": "This request falls outside the agreed scope and would be handled as a billable change order.",
+        "rev": "By my count this is revision round {n}; the agreement includes {limit}. Further changes are billable.",
         "close": "Work on this item will start once you approve the estimate in writing.",
     },
 }
@@ -78,25 +103,37 @@ def draft(f: Finding, card: RateCard, tone: str = "friendly", revision_limit: in
     t = _TONES.get(tone, _TONES["friendly"])
     est = f.estimate or {}
     cur = est.get("currency", card.currency)
-    cite = (f"{f.clause_id}" + (f" (SOW {f.clause_ref})" if f.clause_ref else "")) if f.clause_id else "no matching clause"
-    mid = t["rev"].format(n=revision_limit or "") if f.rule == "revision_limit" else t["mid"]
+    cite = (f"{f.clause_id}" + (f" (SOW {md_escape(f.clause_ref)})" if f.clause_ref else "")) if f.clause_id else "no matching clause"
+    if f.rule == "revision_limit":
+        n = f.request.revision_round or "?"
+        mid = t["rev"].format(n=n, limit=revision_limit or "?")
+    else:
+        mid = t["mid"]
     if est.get("hours") is not None:
         calc = (f"{est['hours']:g} h x {money(est['rate'], cur)}/h = {money(est['amount'], cur)} "
                 f"(plausible range {est['hours_low']:g}-{est['hours_high']:g} h, "
                 f"{money(est['amount_low'], cur)}-{money(est['amount_high'], cur)})")
     else:
         calc = f"{money(est.get('amount', 0), cur)} (fixed price from rate card)"
+    quotes = " / ".join(f'"{md_escape(q)}"' for q in f.request.all_quotes())
     lines = [
         "> DRAFT. scopeguard never sends anything. Review, edit the estimate, then send it yourself.",
         "",
-        f"**Subject:** Quick scope check: {f.title or 'your request'}",
+        f"**Subject:** Quick scope check: {md_escape(one_line(f.title or 'your request', 80))}",
         "",
-        f"Hi {_first_name(f.request.sender)},",
+        f"Hi {md_escape(_first_name(f.request.sender))},",
         "",
-        f"{t['open']} You asked: " + " / ".join(f'"{q}"' for q in f.request.all_quotes()),
+        f"{t['open']} {_SOFT}",
+        "",
+        f"You asked: {quotes}",
         "",
         f"{mid} " + (f"The closest part of the agreed scope is: {cite}." if f.clause_id
                      else "I couldn't find anything in the agreed scope that covers it."),
+    ]
+    if f.rule == "revision_limit":
+        lines += ["", "Correct me if I've miscounted. Here is how I counted the rounds:"]
+        lines += [f"- {md_escape(x)}" for x in (f.round_log or ["(round details unavailable)"])]
+    lines += [
         "",
         f"**Estimate:** {calc}",
         "",
@@ -106,8 +143,8 @@ def draft(f: Finding, card: RateCard, tone: str = "friendly", revision_limit: in
         "[Your name]",
         "",
         "---",
-        f"_Basis: {est.get('basis', 'n/a')}. Classified {f.cls} with confidence {f.confidence:.2f}. "
-        f"Reason: {f.reason}_",
+        f"_Basis: {md_escape(est.get('basis', 'n/a'))}. Classified {f.cls} with confidence {f.confidence:.2f}. "
+        f"Reason: {md_escape(f.reason)}_",
     ]
     if est.get("placeholder_rate"):
         lines.append("_Warning: no rates.yaml was supplied, so a placeholder hourly rate was used. Edit the figure._")
@@ -115,8 +152,9 @@ def draft(f: Finding, card: RateCard, tone: str = "friendly", revision_limit: in
 
 
 def extra_work(findings) -> dict:
-    """Totals over OUT-OF-SCOPE items that cite a clause. Each consolidated item counts once."""
-    items = [f for f in findings if f.cls == "OUT-OF-SCOPE" and f.estimate and f.clause_id]
+    """Totals over draftable items only (OUT-OF-SCOPE, cited clause, confidence >= 0.75, a real request).
+    Each consolidated item counts once."""
+    items = [f for f in findings if draftable(f)]
     hl = sum(f.estimate["hours_low"] for f in items if f.estimate.get("hours") is not None)
     hh = sum(f.estimate["hours_high"] for f in items if f.estimate.get("hours") is not None)
     return {"n": len(items), "amount_low": round(sum(f.estimate["amount_low"] for f in items), 2),
@@ -129,7 +167,7 @@ def extra_work(findings) -> dict:
 def headline(findings, currency: str) -> str:
     t = extra_work(findings)
     if not t["n"]:
-        return "No out-of-scope items with a cited clause were found."
+        return "No billable out-of-scope items were found."
     extra = f", plus {t['fixed']} fixed-price" if t["fixed"] else ""
     return (f"Estimated extra work (review before sending): {money(t['amount_low'], currency)} to "
             f"{money(t['amount_high'], currency)} across {t['n']} items ({t['hours_low']:g}-{t['hours_high']:g} h{extra})")

@@ -4,7 +4,9 @@
 
 Hi Dana,
 
-Thanks for this, and happy to help. You asked: "How about a Spanish version of the whole site too?"
+Thanks for this, and happy to help. Just checking: is this something you'd like added? If so, here's what it would cost.
+
+You asked: "How about a Spanish version of the whole site too?"
 
 This one sits outside what we agreed in the project scope, so I'd like to handle it as a small add-on. That keeps the original timeline and budget safe. The closest part of the agreed scope is: C14 (SOW 3.3).
 

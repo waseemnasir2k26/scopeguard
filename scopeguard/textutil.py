@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import lru_cache
 
 _WS = re.compile(r"\s+")
 
@@ -54,7 +55,7 @@ _CONCEPT_GROUPS = {
     "responsive": "responsive mobile phone phones tablet iphone",
     "form": "form forms enquiry inquiry",
     "gallery": "gallery galleries",
-    "image": "image images photo photos picture pictures",
+    "image": "image images photo photos picture pictures photograph photographs",
     "membership": "login logins member members membership account accounts",
     "chat": "chatbot chat whatsapp livechat",
 }
@@ -80,6 +81,7 @@ def _stem(w: str) -> str:
     return w
 
 
+@lru_cache(maxsize=65536)
 def concepts(text: str) -> dict[str, int]:
     """Return {token_or_concept: weight} for the content of text."""
     text = unicodedata.normalize("NFKC", text or "")

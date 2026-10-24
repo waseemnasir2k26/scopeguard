@@ -7,7 +7,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .changeorder import draft
+from .changeorder import draft, draftable
 from .messages import parse_text_blob
 from .models import OUT_OF_SCOPE
 from .outputs import to_dict
@@ -36,12 +36,21 @@ def check_bind(host: str, token: str | None) -> None:
                         "(or SCOPEGUARD_TOKEN). Use 127.0.0.1 for local-only access.")
 
 
-def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: str | None = None) -> ThreadingHTTPServer:
+def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: str | None = None,
+                allowed_hosts: tuple = ()) -> ThreadingHTTPServer:
     check_bind(host, token)
+    allowed = {"localhost", "127.0.0.1", "[::1]", "::1", host.lower()} | {h.lower() for h in allowed_hosts}
     lock = threading.Lock()   # one analysis at a time: protects a single local GPU
 
     class H(BaseHTTPRequestHandler):
         server_version = "scopeguard"
+        timeout = 30          # read timeout per connection, so a stalled client cannot hold a thread forever
+
+        def _host_ok(self) -> bool:
+            """Reject requests whose Host header is not ours (blocks DNS-rebinding from a web page)."""
+            h = (self.headers.get("Host") or "").lower().strip()
+            name = h.rsplit(":", 1)[0] if not h.endswith("]") and ":" in h else h
+            return name in allowed or name.strip("[]") in allowed
 
         def log_message(self, fmt, *args):  # never log bodies (client data)
             pass
@@ -52,6 +61,8 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Connection", "close")
+            self.close_connection = True
             self.end_headers()
             self.wfile.write(body)
 
@@ -65,11 +76,17 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
             return hmac.compare_digest(got.encode(), token.encode())
 
         def do_GET(self):
+            if not self._host_ok():
+                return self._send(403, {"error": "forbidden host"})
             if self.path == "/healthz":
-                return self._send(200, {"ok": True, "clauses": len(sow.clauses), "model": opts.llm.label()})
+                if not self._authed():
+                    return self._send(401, {"error": "unauthorized"})
+                return self._send(200, {"ok": True})        # deliberately minimal: no model, no SOW details
             self._send(404, {"error": "not found"})
 
         def do_POST(self):
+            if not self._host_ok():
+                return self._send(403, {"error": "forbidden host"})
             if self.path != "/analyze":
                 return self._send(404, {"error": "not found"})
             if not self._authed():
@@ -99,7 +116,7 @@ def make_server(host: str, port: int, sow, sow_text: str, opts: Options, token: 
             except Exception as e:  # report, never crash the server
                 return self._send(500, {"error": f"analysis failed: {type(e).__name__}"})
             out = to_dict(res)
-            drafts = {f.id: draft(f, opts.rates, tone, sow.revision_limit) for f in res.findings if f.cls == OUT_OF_SCOPE}
+            drafts = {f.id: draft(f, opts.rates, tone, sow.revision_limit) for f in res.findings if draftable(f)}
             out["drafts"] = drafts
             out["out_of_scope_count"] = len(drafts)
             out["note"] = "Drafts only. scopeguard never sends anything."

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .classify import classify_one
-from .extract import is_revision
+from .extract import classify_act, is_revision
 from .models import CLASSES, Request, Sow
 
 
@@ -21,9 +21,10 @@ def load_labels(path: str | Path) -> list[dict]:
 def run_eval(sow: Sow, items: list[dict], llm, min_confidence: float = 0.5, progress=None) -> dict:
     rows = []
     for i, it in enumerate(items, 1):
-        rev = is_revision(it["text"])
+        act = classify_act(it["text"])
+        rev = is_revision(it["text"]) and act == "request"
         req = Request(id=it.get("id", f"L{i}"), message_id=f"M{i}", sender="Client", ts=None, quote=it["text"],
-                      is_revision=rev, revision_round=int(it.get("round", 1)) if rev else 0)
+                      is_revision=rev, revision_round=int(it.get("round", 1)) if rev else 0, act=act)
         f = classify_one(req, i, sow, llm, lambda s: s, min_confidence)
         rows.append({"id": req.id, "text": it["text"], "tag": it.get("tag", ""), "expect": it["expect"],
                      "got": f.cls, "rule": f.rule, "clause": f.clause_id, "ok": f.cls == it["expect"],

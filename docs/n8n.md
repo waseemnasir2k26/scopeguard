@@ -18,7 +18,8 @@ scopeguard serve --sow sow.md --rates rates.yaml --client "Dana Okafor" --llm ol
 - With a token, every request needs `Authorization: Bearer <token>` (or `X-Scopeguard-Token`).
 - The SOW is loaded once at start-up. One SOW per server; run one server per client on different ports.
 - Requests are analysed one at a time, so a single local GPU is never hit twice at once.
-- Request bodies are capped at 1 MB and are never logged.
+- Request bodies are capped at 1 MB and are never logged. A connection that stalls for 30 s is dropped.
+- The `Host` header must be `localhost`, `127.0.0.1`, the address you bound to, or one passed with `--allowed-host`; anything else gets 403 (this blocks DNS-rebinding from a web page).
 
 ## 2. Import the workflow
 
@@ -41,7 +42,7 @@ scopeguard serve --sow sow.md --rates rates.yaml --client "Dana Okafor" --llm ol
 }
 ```
 
-Response: `findings[]` (class, confidence, quote, clause, rule, reason, estimate), `drafts{id: markdown}`, `out_of_scope_count`. `GET /healthz` returns `{"ok": true}`.
+Response: `findings[]` (class, confidence, quote, clause, rule, reason, estimate), `drafts{id: markdown}`, `out_of_scope_count`. `GET /healthz` returns `{"ok": true}` and needs the token too when one is set.
 
 ## Notes
 

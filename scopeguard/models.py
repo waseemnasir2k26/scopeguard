@@ -29,6 +29,9 @@ class Sow:
     page_count: Optional[int] = None          # "a five-page website"
     page_names: list = field(default_factory=list)   # "Home, About, Services, ..." (lowercase)
     page_clause: Optional[str] = None
+    caps: list = field(default_factory=list)          # numeric limits: {"unit","n","clause"}
+    client_supplied: list = field(default_factory=list)   # concept tokens the client provides (copy, logo files, photos)
+    client_clause: Optional[str] = None
 
     def by_id(self, cid: str) -> Optional[Clause]:
         for c in self.clauses:
@@ -58,6 +61,7 @@ class Request:
     revision_round: int = 0
     extra_quotes: list = field(default_factory=list)   # consolidated duplicates / split parts
     message_ids: list = field(default_factory=list)
+    act: str = "request"          # request | retracted | hypothetical
 
     def all_quotes(self) -> list:
         return [self.quote] + list(self.extra_quotes)
@@ -82,3 +86,4 @@ class Finding:
     estimate: Optional[dict] = None
     draft_file: str = ""
     notes: list[str] = field(default_factory=list)
+    round_log: list = field(default_factory=list)     # counted revision rounds, for the hedge in drafts
