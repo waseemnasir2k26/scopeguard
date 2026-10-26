@@ -199,7 +199,7 @@ pip install ".[dev]"
 python -m pytest
 ```
 
-231 tests: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter and SOW exceptions, revision counter, phrase-level exclusions, page counter, numeric caps and the quantity parser, retractions and withdrawals, conditionals and sarcasm, free offers, client matching, client-supplied assets, LLM-trust checks, consolidation, evidence rule and scale (50,000 messages), `analyze` writing no drafts, `bill` / `dismiss` / ledger (concurrent writers, stale lock), the safety net (33 phrasings of "take it back"), id stability across export formats, ledger corruption and repair, thread accumulation in `watch` and `serve`, and the critics' probe files, change-order maths, HTML and CSV escaping, never-send, redaction, server auth, Host header and timeout, and the eval sets.
+The test suite covers: parsers (WhatsApp Android and iOS, eml, mbox, txt, Slack/Upwork), clause splitter and SOW exceptions, revision counter, phrase-level exclusions, page counter, numeric caps and the quantity parser, retractions and withdrawals, conditionals and sarcasm, free offers, client matching, client-supplied assets, LLM-trust checks, consolidation, evidence rule and scale (50,000 messages), `analyze` writing no drafts, `bill` / `dismiss` / ledger (concurrent writers, stale lock), the safety net (33 phrasings of "take it back"), id stability across export formats, ledger corruption and repair, thread accumulation in `watch` and `serve`, and the critics' probe files, change-order maths, HTML and CSV escaping, never-send, redaction, server auth, Host header and timeout, and the eval sets.
 
 ## Need this wired into your business?
 
