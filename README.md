@@ -38,7 +38,7 @@ scopeguard bill --all-strong --out out        # lists the strong candidates, ask
 scopeguard dismiss 5a833369 --out out        # "not an extra": hidden on every later run
 ```
 
-`--client` is required whenever the export has more than one sender. scopeguard does not guess who the client is: the name is matched on whole name tokens (`Dana` matches `Dana Okafor`, `Dan` matches nothing). Create your own rate card with `scopeguard init`.
+`--client` is required whenever the export has more than one sender. For a single-sender export a `--client` that matches nobody is ignored with a warning, because there is no one else it could be. scopeguard does not guess who the client is: the name is matched on whole name tokens (`Dana` matches `Dana Okafor`, `Dan` matches nothing). Create your own rate card with `scopeguard init`.
 
 | File in `out/`       | What                                                                                                  |
 | -------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -95,6 +95,7 @@ The rules behind it:
 - **The model cannot create a bill.** An LLM OUT verdict is valid only if it cites an _exclusion_ the request actually mentions; citing a deliverable contradicts the SOW and becomes UNCLEAR. An IN verdict must be supported by its clause too. Prompt-injection text in a client message therefore cannot turn included work into a possible extra.
 - **Merging is conservative.** Two items merge only when the verdict and the kind of clause cited match.
 - **A safety net, because no list of words is complete.** Withdrawals are recognised by wording (cancel, drop, skip, scratch, ignore, remove, hold off, pause, disregard, leave out, "won't do", "no longer required", "no X please", with pls/plz shorthand), but a verb plus an object counts only when it names something an earlier request was about. Beyond that, **any later client message about the same thing that is not a plain request for it** moves a possible extra to "Needs your call" with the reason "later message mentions this: ...". A plain repeat ("please add the online shop soon") does not, and a follow-up sentence in the same message that just explains the ask ("half our visitors speak Spanish") does not. `bill --all-strong` can never include such an item, and its listing shows the latest related client message for every item.
+- **A repeat of something you decided is held, not billed.** A new possible extra whose wording reads as a repeat of an item already billed or dismissed (content-word overlap of at least 0.5, or the same clause with two shared content words) moves to "Needs your call" and names the earlier item. `bill --all-strong` skips it and lists it; `scopeguard bill <id> --repeat-ok` drafts it only when you say it really is a new request.
 - **Nothing is dropped silently.** Every client sentence ends up in one of three places: an item, the retraction linked to the item it withdrew, or the "Other client messages" section at the bottom of the report (and in `findings.json`) with the reason it was not an item (pleasantry, status question, billing admin, too short, no request wording).
 
 ## Measured accuracy

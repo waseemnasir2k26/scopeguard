@@ -12,9 +12,9 @@ from .changeorder import draft
 from .classify import short_title  # noqa: F401  (re-exported for callers)
 from .fsutil import atomic_write
 from .ledger import Ledger
-from .models import Finding, Request
+from .models import OUT_OF_SCOPE, Finding, Request
 from .rates import RateCard
-from .status import BILLED, DISMISSED, EXTRA, is_strong
+from .status import BILLED, CALL, DISMISSED, EXTRA, is_strong
 from .textutil import slug
 
 
@@ -40,7 +40,8 @@ def from_dict(d: dict) -> Finding:
                 rule=d.get("rule"), estimate=d.get("estimate"), draft_file=d.get("draft_file") or "",
                 notes=list(d.get("notes") or []), round_log=list(d.get("round_log") or []),
                 status=d.get("status") or "", fingerprint=d.get("fingerprint") or "", free_by=d.get("free_by") or "",
-                later_mention=d.get("later_mention") or "", latest_related=d.get("latest_related") or "")
+                later_mention=d.get("later_mention") or "", latest_related=d.get("latest_related") or "",
+                repeat_of=d.get("repeat_of") or "")
     return f
 
 
@@ -72,9 +73,15 @@ def select(findings: list[Finding], ids: list[str]) -> list[Finding]:
     return chosen
 
 
+def held_back_repeats(findings: list[Finding]) -> list[Finding]:
+    """Items held out of Possible extras because they read as a repeat of something you already decided."""
+    return [f for f in findings if f.repeat_of and f.status == CALL]
+
+
 def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "friendly", all_strong: bool = False,
-         confirm: Callable[[list[Finding]], bool] | None = None) -> list[Path]:
-    """Write drafts for the chosen items. Refuses anything that is not a Possible extra."""
+         confirm: Callable[[list[Finding]], bool] | None = None, repeat_ok: bool = False) -> list[Path]:
+    """Write drafts for the chosen items. Refuses anything that is not a Possible extra, except a repeat
+    held by the repeat check, which is drafted only when you name it AND pass repeat_ok (--repeat-ok)."""
     data, findings = load_findings(out_dir)
     if all_strong:
         chosen = [f for f in findings if is_strong(f)]
@@ -87,6 +94,13 @@ def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "frien
             raise BillError("Name the item(s) to draft, for example: scopeguard bill 3f2a9c1d, or use --all-strong.")
         chosen = select(findings, ids)
     for f in chosen:
+        if f.repeat_of and f.status == CALL:
+            if not repeat_ok:
+                raise BillError(f"{f.id} {f.fingerprint} {f.repeat_of}. It looks like a repeat, so scopeguard will not "
+                                "draft it. If it really is a new request, run again with --repeat-ok.")
+            if f.cls != OUT_OF_SCOPE or not f.clause_id or not f.estimate:
+                raise BillError(f"{f.id} {f.fingerprint} has no clause and estimate to draft from; decide by hand.")
+            continue
         if f.status != EXTRA:
             raise BillError(f"{f.id} {f.fingerprint} is '{f.status}', not a possible extra, so scopeguard will not draft it. "
                             "Edit the SOW or decide by hand if you disagree.")
@@ -100,7 +114,7 @@ def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "frien
         name = f"{f.fingerprint}-{slug(f.title)}.md"
         (co / name).write_text(draft(f, card, tone, data.get("revision_limit")), encoding="utf-8")
         ledger.record(f.fingerprint, "billed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender,
-                      draft=f"change-orders/{name}")
+                      draft=f"change-orders/{name}", clause=f.clause_id or "")
         by_fp[f.fingerprint]["draft_file"] = f"change-orders/{name}"
         by_fp[f.fingerprint]["status"] = BILLED
         written.append(co / name)
@@ -114,7 +128,8 @@ def dismiss(out_dir: str | Path, ids: list[str]) -> list[Finding]:
     ledger = ledger_for(data, out_dir)
     by_fp = {d["fingerprint"]: d for d in data["findings"]}
     for f in chosen:
-        ledger.record(f.fingerprint, "dismissed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender)
+        ledger.record(f.fingerprint, "dismissed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender,
+                      clause=f.clause_id or "")
         by_fp[f.fingerprint]["status"] = DISMISSED
     _save(Path(out_dir), data, ledger)
     return chosen

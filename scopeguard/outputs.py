@@ -126,5 +126,6 @@ def to_dict(res: Result) -> dict:
             "revision_round": f.request.revision_round, "act": f.request.act,
             "withdrawn_by": f.request.withdrawn_by or None, "free_by": f.free_by or None,
             "later_mention": f.later_mention or None, "latest_related": f.latest_related or None,
+            "repeat_of": f.repeat_of or None,
         } for f in res.findings],
     }

@@ -21,7 +21,8 @@ from .rates import RateCard
 from .redact import redact
 from .rules import assign_revision_rounds, rounds_log
 from .sow import load_sow, parse_sow
-from .status import assign_status
+from .repeat import find_repeat
+from .status import CALL, EXTRA, assign_status
 from .textutil import normalize
 
 MAX_MESSAGES = 200_000
@@ -75,11 +76,13 @@ def select_client_messages(messages: list[Message], sow_text: str, client: list[
     senders = list(dict.fromkeys(m.sender for m in messages))
     if client:
         chosen_senders: list[str] = []
+        unmatched: list[str] = []
         for entry in client:
             want = _tokens(entry)
             hits = [s for s in senders if want and set(want) <= set(_tokens(s))]
             if not hits:
-                raise ClientError(f"--client {entry!r} matches no sender. Senders found: {senders}")
+                unmatched.append(entry)
+                continue
             if len(hits) > 1:
                 raise ClientError(f"--client {entry!r} matches several senders {hits}. Refusing to guess which one is the "
                                   "client: pass the full name of exactly one of them.")
@@ -88,6 +91,13 @@ def select_client_messages(messages: list[Message], sow_text: str, client: list[
                 raise ClientError(f"--client {entry!r} matches {hits[0]!r}, who is named as the freelancer in the SOW "
                                   f"({freelancer!r}). Pass the client's name instead.")
             chosen_senders += [h for h in hits if h not in chosen_senders]
+        if unmatched:
+            if len(senders) == 1:
+                # one sender: there is no one else it could be, so --client cannot change who the client is
+                warnings.append(f"--client {unmatched[0]!r} matches no sender; this export has one sender "
+                                f"({senders[0]!r}), so every message is taken as the client's and --client is ignored.")
+                return list(messages), warnings
+            raise ClientError(f"--client {unmatched[0]!r} matches no sender. Senders found: {senders}")
         return [m for m in messages if m.sender in chosen_senders], warnings
     if me:
         mine = [_tokens(x) for x in me]
@@ -168,6 +178,24 @@ def _rebind_ledger(findings: list, decisions: dict, warnings: list) -> None:
                 warnings.append(f"Your earlier decision ({v.get('decision')}) was re-bound to {f.fingerprint} by quote "
                                 f"similarity: the id of \"{f.request.quote[:60]}\" changed from {k}.")
                 break
+
+
+def _flag_repeats(findings: list, decisions: dict) -> None:
+    """A possible extra that reads as a repeat of an item you already billed or dismissed goes to
+    "Needs your call", with the earlier item named. Nothing is billed on its own: `bill <id> --repeat-ok` only."""
+    for f in findings:
+        if f.status != EXTRA:
+            continue
+        hit = find_repeat(f.request.all_quotes(), f.clause_id or "", decisions)
+        if hit is None:
+            continue
+        fp, entry = hit
+        kind = entry.get("decision")
+        date = (entry.get("date") or "")[:10] or "no date"
+        f.repeat_of = f'{kind} item {fp} ({date}): "{entry.get("quote", "")}"'
+        f.reason = f"looks like a repeat of {kind} item {fp} ({date}): {entry.get('quote', '')}"
+        f.status = CALL
+        f.notes.append("held out of Possible extras by the repeat check: bill it only with --repeat-ok")
 
 
 def _apply_free_offers(findings: list, all_messages: list, client_msgs: list) -> int:
@@ -261,6 +289,7 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
         else:
             f.estimate = None
         assign_status(f, decisions)
+    _flag_repeats(findings, decisions)
     _safety_net(findings, all_requests, others)
     counts: dict = {}
     for f in findings:

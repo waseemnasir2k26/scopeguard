@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 - 2026-10-26
+
+- Double-bill fix: a new possible extra that reads as a repeat of an item you already billed or dismissed is held in "Needs your call" with the reason "looks like a repeat of <billed|dismissed> item <id> (<date>): <quote>". The match is stemmed content-word Jaccard >= 0.5, or the same cited clause with two shared content words, against every ledger entry. Generic request words (add, page, site ...) do not count as shared subject. The bill listing shows held repeats; `bill --all-strong` never includes them; `bill <id>` on one refuses unless you pass `--repeat-ok`. The ledger now records the clause of each decision. Findings carry `repeat_of`.
+- `--client` for a single-sender export: a non-matching name is ignored with a warning instead of an error. Multi-sender exports still refuse a name that matches nobody.
+- 12 new regression tests (tests/test_round4.py); 239 pass.
+
 ## 1.1.1 - 2026-10-25
 
 - Withdrawals no longer depend on a closed vocabulary: a safety net moves any possible extra to "Needs your call" when a later client message about the same thing is not a plain request for it ("later message mentions this: ..."). Retraction wording widened (cancel, drop, skip, scratch, ignore, remove, hold off, pause, disregard, leave out, won't do, no longer required, no X please, pls/plz). `bill --all-strong` cannot include such items and its listing shows the latest related client message.

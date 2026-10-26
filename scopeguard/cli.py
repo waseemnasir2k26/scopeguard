@@ -24,7 +24,7 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--model", help="override the model name for the chosen backend")
     p.add_argument("--allow-cloud", action="store_true", help="let --llm auto fall back to Groq/Gemini (sends text off this machine)")
     p.add_argument("--client", action="append", default=[], help="the client's name, matched on whole name tokens "
-                   "(repeatable). Required when the export has several senders")
+                   "(repeatable). Required when the export has several senders; ignored with a warning for a single sender")
     p.add_argument("--me", action="append", default=[], help="your own sender name to ignore (repeatable)")
     p.add_argument("--tone", choices=["friendly", "neutral", "firm"], default="friendly")
     p.add_argument("--redact", action="store_true", help="mask emails (also name [at] host [dot] com), card numbers, IBANs, "
@@ -71,7 +71,7 @@ def cmd_analyze(args) -> int:
 
 
 def cmd_bill(args) -> int:
-    from .bill import bill, load_findings
+    from .bill import bill, held_back_repeats, load_findings
     card = load_rates(args.rates)
 
     def confirm(items):
@@ -85,7 +85,13 @@ def cmd_bill(args) -> int:
             return True
         return input(f"Draft change orders for these {len(items)} items? [y/N] ").strip().lower() in ("y", "yes")
 
-    written = bill(args.out, args.items, card, args.tone, all_strong=args.all_strong, confirm=confirm)
+    if args.all_strong:
+        _, found = load_findings(args.out)
+        for f in held_back_repeats(found):
+            print(f"held back (possible repeat, not in --all-strong): {f.fingerprint} {f.request.quote[:70]!r}: {f.repeat_of}. "
+                  f"To draft it anyway: scopeguard bill {f.fingerprint} --repeat-ok --out {args.out}")
+    written = bill(args.out, args.items, card, args.tone, all_strong=args.all_strong, confirm=confirm,
+                   repeat_ok=args.repeat_ok)
     for p in written:
         print(f"drafted {p} (never sent; review and edit before you use it)")
     return 0
@@ -207,6 +213,8 @@ def main(argv=None) -> int:
     b.add_argument("--tone", choices=["friendly", "neutral", "firm"], default="friendly")
     b.add_argument("--all-strong", action="store_true", help="list the strong possible extras and ask y/N")
     b.add_argument("--yes", action="store_true", help="with --all-strong: skip the y/N prompt")
+    b.add_argument("--repeat-ok", action="store_true", help="draft an item held as a repeat of one you already billed or "
+                   "dismissed (only when it really is a new request)")
     b.set_defaults(fn=cmd_bill)
 
     lg = sub.add_parser("ledger", help="check or repair the decisions ledger")

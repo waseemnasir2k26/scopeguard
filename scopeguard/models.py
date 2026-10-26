@@ -105,3 +105,4 @@ class Finding:
     free_by: str = ""         # a freelancer message offering this for free
     later_mention: str = ""   # a later client sentence that mentions this and is not a plain request for it
     latest_related: str = ""  # the latest later client sentence about it (shown before you bill)
+    repeat_of: str = ""       # a reworded repeat of an item you already billed or dismissed (held for --repeat-ok)
