@@ -21,8 +21,8 @@ from .rates import RateCard
 from .redact import redact
 from .rules import assign_revision_rounds, rounds_log
 from .sow import load_sow, parse_sow
-from .repeat import find_repeat
-from .status import CALL, EXTRA, assign_status
+from .repeat import find_repeat, same_ask
+from .status import BILLED, CALL, EXTRA, WITHDRAWN, assign_status, withdrawn_after_draft_text
 from .textutil import normalize
 
 MAX_MESSAGES = 200_000
@@ -181,21 +181,50 @@ def _rebind_ledger(findings: list, decisions: dict, warnings: list) -> None:
 
 
 def _flag_repeats(findings: list, decisions: dict) -> None:
-    """A possible extra that reads as a repeat of an item you already billed or dismissed goes to
-    "Needs your call", with the earlier item named. Nothing is billed on its own: `bill <id> --repeat-ok` only."""
+    """A possible extra that reads as a repeat goes to "Needs your call". Two checks, both the same rule:
+    (1) a repeat of an item you already billed or dismissed, with the earlier item named;
+    (2) a repeat of ANOTHER possible extra in this same export: the earliest is kept as the extra, each later
+        one is held as "repeat of REQ-xx in this export". Nothing is billed on its own: `bill <id> --repeat-ok` only."""
+    kept: list = []
     for f in findings:
         if f.status != EXTRA:
             continue
         hit = find_repeat(f.request.all_quotes(), f.clause_id or "", decisions)
-        if hit is None:
+        if hit is not None:
+            fp, entry = hit
+            kind = entry.get("decision")
+            date = (entry.get("date") or "")[:10] or "no date"
+            f.repeat_of = f'{kind} item {fp} ({date}): "{entry.get("quote", "")}"'
+            f.reason = f"looks like a repeat of {kind} item {fp} ({date}): {entry.get('quote', '')}"
+            _hold(f)
             continue
-        fp, entry = hit
-        kind = entry.get("decision")
-        date = (entry.get("date") or "")[:10] or "no date"
-        f.repeat_of = f'{kind} item {fp} ({date}): "{entry.get("quote", "")}"'
-        f.reason = f"looks like a repeat of {kind} item {fp} ({date}): {entry.get('quote', '')}"
-        f.status = CALL
-        f.notes.append("held out of Possible extras by the repeat check: bill it only with --repeat-ok")
+        twin = next((k for k in kept if same_ask(f.request.all_quotes(), f.clause_id or "",
+                                                 k.request.all_quotes(), k.clause_id or "")), None)
+        if twin is not None:
+            f.repeat_of = f'repeat of {twin.id} in this export: "{twin.request.quote}"'
+            f.reason = f"looks like a repeat of {twin.id} in this export (the same ask, kept once): {twin.request.quote}"
+            _hold(f)
+            continue
+        kept.append(f)
+
+
+def _withdrawn_after_draft(f, decisions: dict) -> None:
+    """A withdrawn item you already billed: the change-order draft exists, so the report says so and points at it.
+    A withdrawn item with no billed decision is simply never billed."""
+    if f.status != WITHDRAWN:
+        return
+    entry = decisions.get(f.fingerprint) or {}
+    if entry.get("decision") == BILLED:
+        f.billed_on = (entry.get("at") or "")[:10] or "an unknown date"
+        f.draft_file = entry.get("draft") or f.draft_file
+        f.reason = withdrawn_after_draft_text(f)
+    else:
+        f.reason = f"{f.reason} Never billed."
+
+
+def _hold(f) -> None:
+    f.status = CALL
+    f.notes.append("held out of Possible extras by the repeat check: bill it only with --repeat-ok")
 
 
 def _apply_free_offers(findings: list, all_messages: list, client_msgs: list) -> int:
@@ -289,6 +318,7 @@ def analyze(sow: Sow | str | Path, message_paths=None, opts: Optional[Options] =
         else:
             f.estimate = None
         assign_status(f, decisions)
+        _withdrawn_after_draft(f, decisions)
     _flag_repeats(findings, decisions)
     _safety_net(findings, all_requests, others)
     counts: dict = {}

@@ -31,6 +31,16 @@ def assign_status(f: Finding, decisions: dict | None = None) -> str:
     return status
 
 
+def withdrawn_after_draft_text(f: Finding) -> str:
+    return (f"Withdrawn after a change order was drafted on {f.billed_on}: check before sending "
+            f"{f.draft_file or 'the draft'}")
+
+
+def billed_then_withdrawn(findings: list) -> list:
+    """Items you already drafted a change order for, which the client has since withdrawn: check before sending."""
+    return [f for f in findings if f.billed_on]
+
+
 def is_extra(f: Finding) -> bool:
     return f.status == EXTRA
 

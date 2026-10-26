@@ -23,7 +23,10 @@ _RETRACT = re.compile(
     r"|\bwe (?:won'?t|will not|are not going to|aren'?t going to) (?:be )?(?:do|doing|need|want|add|go|going|have|having|"
     r"build|building|proceed|proceeding|use|using)\b|\bno longer (?:required|needed|need|want|wanted|necessary|relevant)\b"
     r"|\bnot (?:required|necessary)\b|\bhold off\b|\bdisregard (?:that|this|it|my)\b|\bditch (?:that|this|it)\b"
-    r"|\bcancel(?:le?d)? (?:that|this|it)\b|\bdrop (?:that|this)\b|\bskip (?:that|this|it)\b|\bignore (?:that|this|it)\b", re.I)
+    r"|\bcancel(?:le?d)? (?:that|this|it)\b|\bdrop (?:that|this)\b|\bskip (?:that|this|it)\b|\bignore (?:that|this|it)\b"
+    r"|\bdecided against\b|\bno (?:[\w-]+ ){1,2}needed after all\b|\bnot needed after all\b"
+    r"|\bleave (?:the |our |my |that |this )?[\w-]+(?: [\w-]+)? out\b"
+    r"|\b(?:we'?ll|we will|we'?re going to|we are going to) pass\b|\bpass on (?:it|that|this|the)\b", re.I)
 # "Cancel the shop", "Pls remove shop", "No shop please": verb + object. Only a retraction if it names something
 # an EARLIER request was about, so "Please drop the files into the About page" stays a request.
 SOFT_RETRACT = re.compile(

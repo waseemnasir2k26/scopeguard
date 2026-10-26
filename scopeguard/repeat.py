@@ -57,6 +57,16 @@ def is_repeat(quote: str, clause: str, old_quote: str, old_clause: str) -> bool:
     return bool(clause) and clause == old_clause and shared >= SHARED_MIN
 
 
+def same_ask(quotes_a: list, clause_a: str, quotes_b: list, clause_b: str) -> bool:
+    """True when any quote of one item repeats any quote of the other (the same rule as is_repeat)."""
+    return any(is_repeat(qa, clause_a, qb, clause_b) for qa in quotes_a for qb in quotes_b)
+
+
+def same_ask(quotes_a: list, clause_a: str, quotes_b: list, clause_b: str) -> bool:
+    """True when any quote of one item repeats any quote of the other (the same rule as is_repeat)."""
+    return any(is_repeat(qa, clause_a, qb, clause_b) for qa in quotes_a for qb in quotes_b)
+
+
 def find_repeat(quotes: list, clause: str, ledger: dict):
     """The first ledger entry (billed or dismissed) that the new item repeats, as (fingerprint, entry), or None.
     Each quote of the item is compared, so a consolidated item cannot hide a repeated part."""

@@ -1,2 +1,2 @@
 """scopeguard: scope-creep detector for freelancers and small agencies."""
-__version__ = "1.1.3"
+__version__ = "1.1.4"

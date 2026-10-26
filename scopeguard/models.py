@@ -106,3 +106,4 @@ class Finding:
     later_mention: str = ""   # a later client sentence that mentions this and is not a plain request for it
     latest_related: str = ""  # the latest later client sentence about it (shown before you bill)
     repeat_of: str = ""       # a reworded repeat of an item you already billed or dismissed (held for --repeat-ok)
+    billed_on: str = ""       # set when you already drafted a change order for an item the client later withdrew

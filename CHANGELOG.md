@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.4 - 2026-10-26
+
+- Double bill in one run fixed: a possible extra that repeats ANOTHER possible extra in the same export is held in "Needs your call" as "repeat of REQ-xx in this export" (same rule as the ledger repeat check). The earliest stays the possible extra. `bill` refuses a batch whose items repeat each other, listing the pairs, and drafts nothing.
+- Billed, then withdrawn: a withdrawn item you already drafted reads "Withdrawn after a change order was drafted on <date>: check before sending <draft file>" (not "Never billed"). The summary and report carry a CRITICAL line, findings.json has `withdrawn_after_draft_on`, and the draft file is renamed `WITHDRAWN-<name>` (never deleted); the ledger follows the new name. "Never billed" now appears only for items with no billed decision.
+- Withdrawal phrasings added: "decided against", "no X needed after all", "not needed after all", "leave X out", "we'll pass on".
+- 22 new regression tests (tests/test_round6.py); 271 pass.
+
 ## 1.1.3 - 2026-10-26
 
 - `bill` validates the ledger before it creates anything: a corrupt ledger refuses (exit 1) with no draft and no `change-orders/` folder. Order is now load and validate, record the decision (atomic), then write the draft; if the draft or the findings save fails, the ledger entry is rolled back and the partial draft removed.

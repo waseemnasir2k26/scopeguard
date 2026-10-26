@@ -6,7 +6,7 @@ from html import escape
 
 from .changeorder import headline, money
 from .rates import RateCard
-from .status import BILLED, CALL, DISMISSED, EXTRA, FREE, IN, LABELS, SET_ASIDE, WITHDRAWN
+from .status import BILLED, CALL, DISMISSED, EXTRA, FREE, IN, LABELS, SET_ASIDE, WITHDRAWN, billed_then_withdrawn
 
 CSS = """
 :root{--bg:#f7f8fa;--card:#fff;--ink:#1b2430;--mute:#5b6675;--line:#e1e5eb;--in:#1c7c4d;--out:#b3261e;--unc:#9a6700;--aside:#6b7280}
@@ -103,6 +103,8 @@ def render_html(res, card: RateCard) -> str:
     if m.get("other_client_messages_total"):
         parts.append(f"<p class=meta>{m['other_client_messages_total']} other client sentences were not turned into items; "
                      "they are listed at the bottom with the reason.</p>")
+    for f in billed_then_withdrawn(res.findings):
+        parts.append(f"<div class=warn><strong>CRITICAL</strong> {_e(f.id)} <code>{_e(f.fingerprint)}</code>: {_e(f.reason)}</div>")
     for w in res.warnings:
         parts.append(f"<div class=warn>{_e(w)}</div>")
     parts.append("<div class=bar role=group aria-label=Filter>")

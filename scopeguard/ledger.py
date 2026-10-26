@@ -75,6 +75,14 @@ class Ledger:
                 d[fingerprint] = previous
             self._write(d)
 
+    def annotate(self, fingerprint: str, **info) -> None:
+        """Add fields to an existing decision without changing when it was made (used when a draft is renamed)."""
+        with self.lock():
+            d = self.decisions()
+            if fingerprint in d:
+                d[fingerprint].update(info)
+                self._write(d)
+
     def forget(self, fingerprint: str) -> bool:
         with self.lock():
             d = self.decisions()

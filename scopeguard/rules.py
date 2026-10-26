@@ -271,7 +271,7 @@ def precheck(req: Request, sow: Sow, state: Optional[dict] = None) -> Optional[d
     text = req.text()
     if req.withdrawn_by:
         return {"cls": UNCLEAR, "clause": None, "rule": "withdrawn", "confidence": 0.9,
-                "reason": f"Withdrawn by the client later: \"{req.withdrawn_by[:100]}\". Never billed."}
+                "reason": f"Withdrawn by the client later: \"{req.withdrawn_by[:100]}\"."}
     if req.hedged:
         return {"cls": UNCLEAR, "clause": None, "rule": "conditional", "confidence": 0.85,
                 "reason": f"Hedged by the client (\"{req.hedged[:80]}\"). Needs your call; never billed."}

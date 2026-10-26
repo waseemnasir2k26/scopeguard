@@ -13,6 +13,7 @@ from .changeorder import draft
 from .classify import short_title  # noqa: F401  (re-exported for callers)
 from .fsutil import atomic_write
 from .ledger import Ledger
+from .repeat import same_ask
 from .models import OUT_OF_SCOPE, Finding, Request
 from .rates import RateCard
 from .status import BILLED, CALL, DISMISSED, EXTRA, is_strong
@@ -79,6 +80,18 @@ def held_back_repeats(findings: list[Finding]) -> list[Finding]:
     return [f for f in findings if f.repeat_of and f.status == CALL]
 
 
+def _refuse_repeats_in_batch(chosen: list[Finding]) -> None:
+    """Two items in one batch that repeat each other would bill the same ask twice: refuse the whole batch."""
+    pairs = []
+    for i, a in enumerate(chosen):
+        for b in chosen[i + 1:]:
+            if same_ask(a.request.all_quotes(), a.clause_id or "", b.request.all_quotes(), b.clause_id or ""):
+                pairs.append(f'{a.id} {a.fingerprint} and {b.id} {b.fingerprint} ("{a.request.quote[:100]}")')
+    if pairs:
+        raise BillError("Nothing drafted: these items repeat each other, so drafting them together would bill the same "
+                        "request twice: " + "; ".join(pairs) + ". Name only one item of each pair.")
+
+
 def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "friendly", all_strong: bool = False,
          confirm: Callable[[list[Finding]], bool] | None = None, repeat_ok: bool = False) -> list[Path]:
     """Write drafts for the chosen items. Refuses anything that is not a Possible extra, except a repeat
@@ -105,6 +118,7 @@ def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "frien
         if f.status != EXTRA:
             raise BillError(f"{f.id} {f.fingerprint} is '{f.status}', not a possible extra, so scopeguard will not draft it. "
                             "Edit the SOW or decide by hand if you disagree.")
+    _refuse_repeats_in_batch(chosen)
     out = Path(out_dir)
     # Validate the ledger BEFORE anything is created: a corrupt ledger refuses here, with no draft and no folder.
     ledger = ledger_for(data, out)

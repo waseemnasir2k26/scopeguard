@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
 
 from .changeorder import headline, money
@@ -14,7 +15,7 @@ from .models import IN_SCOPE, OUT_OF_SCOPE, UNCLEAR
 from .pipeline import Result
 from .rates import RateCard
 from .report import render_html
-from .status import BILLED, CALL, DISMISSED, EXTRA, FREE, IN, LABELS, SET_ASIDE, WITHDRAWN
+from .status import (BILLED, CALL, DISMISSED, EXTRA, FREE, IN, LABELS, SET_ASIDE, WITHDRAWN, billed_then_withdrawn)
 
 _DANGEROUS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -77,6 +78,8 @@ def write_summary(res: Result, card: RateCard, path: Path) -> None:
         L.append(f"- Other client messages (not turned into items, listed in the report with the reason): {m['other_client_messages_total']}")
     for w in res.warnings:
         L.append(f"- Warning: {w}")
+    for f in billed_then_withdrawn(res.findings):
+        L.append(f"- **CRITICAL** {f.id} `{f.fingerprint}`: {f.reason}")
     L += ["", "> scopeguard suggests; you decide. Nothing was drafted and nothing was sent. To draft a change order for an",
           "> item you agree with: `scopeguard bill <id>`. To stop seeing one: `scopeguard dismiss <id>`.", ""]
     sections = (("Possible extras", [EXTRA]), ("Needs your call", [CALL]), ("In scope", [IN]),
@@ -97,9 +100,26 @@ def write_summary(res: Result, card: RateCard, path: Path) -> None:
     path.write_text("\n".join(L), encoding="utf-8")
 
 
+def _mark_withdrawn_drafts(res: Result, out: Path) -> None:
+    """A draft for an item the client withdrew is renamed WITHDRAWN-<name> so nobody sends it by mistake.
+    Renamed, never deleted; an existing WITHDRAWN- file is never overwritten. The ledger follows the new name."""
+    ledger = Ledger(out / "ledger.json")
+    for f in billed_then_withdrawn(res.findings):
+        src = out / f.draft_file
+        if not f.draft_file or src.name.startswith("WITHDRAWN-") or not src.exists():
+            continue
+        dst = src.with_name("WITHDRAWN-" + src.name)
+        if dst.exists():
+            continue
+        os.replace(src, dst)
+        f.draft_file = dst.relative_to(out).as_posix()
+        ledger.annotate(f.fingerprint, draft=f.draft_file)
+
+
 def write_all(res: Result, out_dir: str | Path, card: RateCard, tone: str = "friendly") -> Path:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    _mark_withdrawn_drafts(res, out)
     d = to_dict(res)
     d["tone"] = tone
     with Ledger(out / "ledger.json").lock():       # one writer at a time; each file replaced atomically
@@ -126,6 +146,6 @@ def to_dict(res: Result) -> dict:
             "revision_round": f.request.revision_round, "act": f.request.act,
             "withdrawn_by": f.request.withdrawn_by or None, "free_by": f.free_by or None,
             "later_mention": f.later_mention or None, "latest_related": f.latest_related or None,
-            "repeat_of": f.repeat_of or None,
+            "repeat_of": f.repeat_of or None, "withdrawn_after_draft_on": f.billed_on or None,
         } for f in res.findings],
     }
