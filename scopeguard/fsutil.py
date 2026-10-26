@@ -5,6 +5,7 @@ import contextlib
 import os
 import shutil
 import time
+import uuid
 from pathlib import Path
 
 LOCK_WAIT = 10.0
@@ -44,16 +45,35 @@ def file_lock(lock_path: str | Path, wait: float = LOCK_WAIT, stale: float = LOC
             lock.unlink()
 
 
+def _replace(src: Path, dst: Path, attempts: int = 10) -> None:
+    """os.replace with retries: on Windows a reader or antivirus scan can hold the target handle for a
+    few milliseconds, which surfaces as PermissionError(13). Back off briefly and try again."""
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(0.02 * (i + 1))
+
+
 def atomic_write(path: str | Path, text: str, backup: bool = False) -> None:
-    """Write `text` to `path` through a temp file in the same folder: fsync, then os.replace. With
-    backup=True the previous version is first copied to `<path>.bak`, so one bad write is never fatal."""
+    """Write `text` to `path` through a uniquely named temp file in the same folder: fsync, then os.replace
+    (retried on Windows). With backup=True the previous version is first copied to `<path>.bak`, so one bad
+    write is never fatal. The temp name is unique per call, so threads in one process never share it."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(text)
-        fh.flush()
-        os.fsync(fh.fileno())
-    if backup and path.exists():
-        shutil.copy2(path, path.with_name(path.name + ".bak"))
-    os.replace(tmp, path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        if backup and path.exists():
+            shutil.copy2(path, path.with_name(path.name + ".bak"))
+        _replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise

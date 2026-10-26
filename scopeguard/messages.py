@@ -99,14 +99,19 @@ def _build_dt(d: str, t: str, order: str) -> Optional[datetime]:
 
 # ---------------------------------------------------------------- WhatsApp
 def looks_like_whatsapp(text: str) -> bool:
+    """Two WhatsApp lines in the first 200, or a single-message export (one non-blank line that is a WhatsApp line)."""
     hits = 0
-    for line in text.splitlines()[:200]:
-        m = _WA.match(_clean_line(line))
-        if m and ":" in m.group("rest"):
-            hits += 1
-            if hits >= 2:
-                return True
-    return False
+    nonblank = 0
+    for line in text.splitlines():
+        clean = _clean_line(line)
+        if not clean.strip():
+            continue
+        nonblank += 1
+        if hits < 2 and nonblank <= 200:
+            m = _WA.match(clean)
+            if m and ":" in m.group("rest"):
+                hits += 1
+    return hits >= 2 or (hits == 1 and nonblank == 1)
 
 
 def parse_whatsapp(text: str, source: str = "") -> list[Message]:

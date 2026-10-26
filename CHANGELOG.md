@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.3 - 2026-10-26
+
+- `bill` validates the ledger before it creates anything: a corrupt ledger refuses (exit 1) with no draft and no `change-orders/` folder. Order is now load and validate, record the decision (atomic), then write the draft; if the draft or the findings save fails, the ledger entry is rolled back and the partial draft removed.
+- Windows: atomic writes use a unique temp name per call and retry `os.replace` on PermissionError (up to 10 attempts with a short backoff), fixing the concurrent-writer flake.
+- WhatsApp: a one-line export (and a file without a trailing newline) is detected and parsed; the sender is no longer `client` and the timestamp no longer lands in the quote.
+- 10 new regression tests (tests/test_round5.py).
+
 ## 1.1.2 - 2026-10-26
 
 - Double-bill fix: a new possible extra that reads as a repeat of an item you already billed or dismissed is held in "Needs your call" with the reason "looks like a repeat of <billed|dismissed> item <id> (<date>): <quote>". The match is stemmed content-word Jaccard >= 0.5, or the same cited clause with two shared content words, against every ledger entry. Generic request words (add, page, site ...) do not count as shared subject. The bill listing shows held repeats; `bill --all-strong` never includes them; `bill <id>` on one refuses unless you pass `--repeat-ok`. The ledger now records the clause of each decision. Findings carry `repeat_of`.

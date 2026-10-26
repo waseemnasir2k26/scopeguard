@@ -64,6 +64,17 @@ class Ledger:
             d[fingerprint] = {"decision": decision, "at": datetime.now().isoformat(timespec="seconds"), **info}
             self._write(d)
 
+    def restore(self, fingerprint: str, previous: dict | None) -> None:
+        """Put back the entry that was there before a record() (or remove it when there was none). Used to
+        roll back a decision whose change-order draft could not be written."""
+        with self.lock():
+            d = self.decisions()
+            if previous is None:
+                d.pop(fingerprint, None)
+            else:
+                d[fingerprint] = previous
+            self._write(d)
+
     def forget(self, fingerprint: str) -> bool:
         with self.lock():
             d = self.decisions()

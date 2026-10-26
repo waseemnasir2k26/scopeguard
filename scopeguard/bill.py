@@ -4,6 +4,7 @@ analyze only suggests. A change-order draft is written here, for the items YOU n
 --all-strong, after you answer y to a listing). Decisions are recorded in the ledger."""
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Callable
@@ -105,21 +106,40 @@ def bill(out_dir: str | Path, ids: list[str], card: RateCard, tone: str = "frien
             raise BillError(f"{f.id} {f.fingerprint} is '{f.status}', not a possible extra, so scopeguard will not draft it. "
                             "Edit the SOW or decide by hand if you disagree.")
     out = Path(out_dir)
-    co = out / "change-orders"
-    co.mkdir(parents=True, exist_ok=True)
+    # Validate the ledger BEFORE anything is created: a corrupt ledger refuses here, with no draft and no folder.
     ledger = ledger_for(data, out)
-    written = []
+    ledger.decisions()
+    co = out / "change-orders"
     by_fp = {d["fingerprint"]: d for d in data["findings"]}
-    for f in chosen:
-        name = f"{f.fingerprint}-{slug(f.title)}.md"
-        (co / name).write_text(draft(f, card, tone, data.get("revision_limit")), encoding="utf-8")
-        ledger.record(f.fingerprint, "billed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender,
-                      draft=f"change-orders/{name}", clause=f.clause_id or "")
-        by_fp[f.fingerprint]["draft_file"] = f"change-orders/{name}"
-        by_fp[f.fingerprint]["status"] = BILLED
-        written.append(co / name)
-    _save(out, data, ledger)
-    return written
+    written: list[Path] = []
+    recorded: list[tuple[str, dict | None]] = []
+    made_dir = not co.exists()
+    try:
+        for f in chosen:
+            name = f"{f.fingerprint}-{slug(f.title)}.md"
+            previous = ledger.decisions().get(f.fingerprint)
+            ledger.record(f.fingerprint, "billed", quote=f.request.quote[:300], date=f.request.ts, sender=f.request.sender,
+                          draft=f"change-orders/{name}", clause=f.clause_id or "")
+            recorded.append((f.fingerprint, previous))
+            co.mkdir(parents=True, exist_ok=True)
+            target = co / name
+            written.append(target)
+            target.write_text(draft(f, card, tone, data.get("revision_limit")), encoding="utf-8")
+            by_fp[f.fingerprint]["draft_file"] = f"change-orders/{name}"
+            by_fp[f.fingerprint]["status"] = BILLED
+        _save(out, data, ledger)
+    except BaseException:
+        # Decision first, draft second: if the draft (or the findings save) failed, undo what this call did.
+        for target in written:
+            with contextlib.suppress(OSError):
+                target.unlink()
+        for fp, previous in reversed(recorded):
+            ledger.restore(fp, previous)
+        if made_dir:
+            with contextlib.suppress(OSError):
+                co.rmdir()
+        raise
+    return list(written)
 
 
 def dismiss(out_dir: str | Path, ids: list[str]) -> list[Finding]:
